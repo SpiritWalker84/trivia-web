@@ -25,7 +25,7 @@ services:
     image: redis:7-alpine
     container_name: trivia-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"  # Внешний порт 6380, внутренний 6379 (если локальный Redis занимает 6379)
     volumes:
       - redis_data:/data
     restart: unless-stopped
