@@ -6,8 +6,12 @@ WORKDIR /app
 # Копируем package файлы
 COPY frontend/package*.json ./
 
-# Устанавливаем зависимости
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+# Устанавливаем зависимости (npm ci быстрее и стабильнее в Docker, чем npm install)
+# --dns-result-order=ipv4first — фикс зависания npm при недоступном IPv6 на сервере
+ENV NODE_OPTIONS=--max-old-space-size=2048 --dns-result-order=ipv4first
+RUN npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    npm ci --legacy-peer-deps --no-audit --no-fund
 
 # Копируем исходный код
 COPY frontend/ .
