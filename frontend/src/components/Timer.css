@@ -1,0 +1,109 @@
+.timer-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.timer-circle-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.timer-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  font-family: 'Inter', sans-serif;
+  text-shadow: 0 0 10px currentColor;
+  transition: color 0.3s ease;
+}
+
+.timer-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.timer-container.warning .timer-number {
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+.timer-container.paused {
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@media (max-width: 768px) {
+  .timer-circle-wrapper {
+    width: 80px;
+    height: 80px;
+  }
+
+  .timer-svg {
+    width: 80px;
+    height: 80px;
+  }
+
+  .timer-number {
+    font-size: 1.5rem;
+  }
+
+  .timer-label {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .timer-circle-wrapper {
+    width: 70px;
+    height: 70px;
+  }
+
+  .timer-svg {
+    width: 70px;
+    height: 70px;
+  }
+
+  .timer-number {
+    font-size: 1.25rem;
+  }
+
+  .timer-label {
+    font-size: 0.65rem;
+  }
+}

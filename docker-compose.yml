@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: trivia-postgres
+    environment:
+      POSTGRES_USER: trivia_user
+      POSTGRES_PASSWORD: trivia_password
+      POSTGRES_DB: trivia_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - trivia-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trivia_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: trivia-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - trivia-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery Worker (для фоновых задач бота)
+  celery:
+    build:
+      context: ..
+      dockerfile: trivia-web/docker/Dockerfile.bot
+    working_dir: /app
+    container_name: trivia-celery
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS}
+      - DATABASE_URL=postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - trivia-network
+    command: celery -A tasks.celery_app worker --loglevel=info
+
+  # Telegram Bot
+  bot:
+    build:
+      context: ..
+      dockerfile: trivia-web/docker/Dockerfile.bot
+    working_dir: /app
+    container_name: trivia-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS}
+      - DATABASE_URL=postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery:
+        condition: service_started
+      migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - trivia-network
+
+  # Database Migrations (запускается один раз при старте)
+  migrations:
+    build:
+      context: ..
+      dockerfile: trivia-web/docker/Dockerfile.bot
+    working_dir: /app
+    container_name: trivia-migrations
+    environment:
+      - DATABASE_URL=postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head || echo 'Migrations completed or no migrations found'"
+    restart: "no"
+    networks:
+      - trivia-network
+
+  # FastAPI для веб-интерфейса
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: trivia-api
+    environment:
+      - DATABASE_URL=postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - trivia-network
+
+  # Frontend (React + Nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: trivia-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - trivia-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  trivia-network:
+    driver: bridge

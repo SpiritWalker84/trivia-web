@@ -1,0 +1,320 @@
+.round-summary {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.round-summary-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.round-summary-header h2 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.round-summary-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.round-summary-leaderboard {
+  margin-bottom: 3rem;
+}
+
+.leaderboard-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  position: relative;
+  min-height: 200px;
+}
+
+.leaderboard-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.leaderboard-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
+  z-index: 0;
+}
+
+.leaderboard-card:hover::before {
+  width: 4px;
+}
+
+.leaderboard-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.leaderboard-card.current-user {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.leaderboard-card.rank-first {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.3);
+}
+
+.leaderboard-card.rank-first::before {
+  background: var(--accent-secondary);
+}
+
+.leaderboard-card.rank-second {
+  background: rgba(183, 190, 221, 0.1);
+  border-color: var(--text-muted);
+}
+
+.leaderboard-card.rank-second::before {
+  background: var(--text-muted);
+}
+
+.leaderboard-card.rank-third {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: var(--timer-orange);
+}
+
+.leaderboard-card.rank-third::before {
+  background: var(--timer-orange);
+}
+
+.card-rank {
+  min-width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.rank-icon {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.leaderboard-card.eliminated {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  position: relative;
+  z-index: 0;
+}
+
+.leaderboard-card.eliminated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.eliminated-score {
+  background: rgba(239, 68, 68, 0.8) !important;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.you-badge {
+  background: var(--accent-primary);
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.card-score {
+  background: var(--accent-primary);
+  color: white;
+  font-weight: 700;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.leaderboard-card.rank-first .card-score {
+  background: var(--accent-secondary);
+  color: var(--bg-primary);
+  box-shadow: 0 2px 8px rgba(250, 204, 21, 0.3);
+}
+
+.leaderboard-card.rank-second .card-score {
+  background: var(--text-muted);
+  box-shadow: 0 2px 8px rgba(183, 190, 221, 0.3);
+}
+
+.leaderboard-card.rank-third .card-score {
+  background: var(--timer-orange);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.3);
+}
+
+.round-summary-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 3rem;
+  flex-wrap: wrap;
+}
+
+.btn-leave-game {
+  padding: 1rem 2rem;
+  background: rgba(239, 68, 68, 0.2);
+  border: 2px solid rgba(239, 68, 68, 0.5);
+  border-radius: 16px;
+  color: var(--danger);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.btn-leave-game:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: var(--danger);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-next-round {
+  background: linear-gradient(135deg, var(--accent-primary), #2563EB);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  padding: 1.25rem 3rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.btn-next-round:hover {
+  box-shadow: 0 6px 30px rgba(59, 130, 246, 0.6);
+  transform: translateY(-2px);
+}
+
+.btn-next-round:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .round-summary {
+    padding: 2rem 1.5rem;
+  }
+
+  .round-summary-header h2 {
+    font-size: 2rem;
+  }
+
+  .round-summary-subtitle {
+    font-size: 1.1rem;
+  }
+
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+    gap: 0.875rem;
+  }
+
+  .leaderboard-card {
+    padding: 1.25rem;
+  }
+
+
+  .card-name {
+    font-size: 1rem;
+  }
+
+  .card-score {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+
+  .btn-next-round {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .round-summary {
+    padding: 1.5rem 1rem;
+  }
+
+  .round-summary-header h2 {
+    font-size: 1.75rem;
+  }
+
+  .leaderboard-card {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+
+  .card-name {
+    font-size: 0.95rem;
+  }
+
+  .card-score {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+  }
+}
