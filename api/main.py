@@ -1,16 +1,36 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
 import random
 import time
 import os
+import sys
 from collections import defaultdict
 from dotenv import load_dotenv
 from contextlib import contextmanager
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, and_, select
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
+
+# Попытка импортировать модели из trivia-bot (если доступны)
+try:
+    # Добавляем путь к trivia-bot в sys.path
+    trivia_bot_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'trivia-bot')
+    if os.path.exists(trivia_bot_path) and trivia_bot_path not in sys.path:
+        sys.path.insert(0, trivia_bot_path)
+    
+    from database.models import (
+        Game, GamePlayer, Round, RoundQuestion, Question, Answer as AnswerModel,
+        User, Theme
+    )
+    DB_MODELS_AVAILABLE = True
+    print("Database models imported successfully from trivia-bot")
+except ImportError as e:
+    print(f"Could not import database models: {e}")
+    print("Will use mock data")
+    DB_MODELS_AVAILABLE = False
+    Game = GamePlayer = Round = RoundQuestion = Question = AnswerModel = User = Theme = None
 
 # Загружаем переменные окружения из .env
 load_dotenv()
@@ -233,27 +253,130 @@ async def root():
     return {"message": "Trivia Web API", "version": "0.1.0"}
 
 @app.get("/api/questions/random", response_model=QuestionResponse)
-async def get_random_question():
-    """Получить случайный вопрос"""
+async def get_random_question(
+    game_id: Optional[int] = Query(None, description="ID игры"),
+    user_id: Optional[int] = Query(None, description="ID пользователя")
+):
+    """Получить следующий вопрос из текущего раунда игры"""
     import traceback
     global current_round_question
     
     print(f"=== /api/questions/random CALLED ===")
+    print(f"game_id={game_id}, user_id={user_id}")
+    
+    # Если БД доступна и указаны game_id и user_id, используем БД
+    if DB_MODELS_AVAILABLE and _db_session_factory and game_id and user_id:
+        try:
+            with get_db_session() as session:
+                # Получаем текущую игру
+                game = session.query(Game).filter(Game.id == game_id).first()
+                if not game:
+                    raise HTTPException(status_code=404, detail="Game not found")
+                
+                if game.status != 'in_progress':
+                    raise HTTPException(status_code=400, detail=f"Game is not in progress (status: {game.status})")
+                
+                # Получаем текущий раунд
+                current_round = session.query(Round).filter(
+                    and_(
+                        Round.game_id == game_id,
+                        Round.status == 'in_progress'
+                    )
+                ).first()
+                
+                if not current_round:
+                    raise HTTPException(status_code=400, detail="No active round found")
+                
+                # Получаем количество вопросов в раунде
+                total_questions = session.query(func.count(RoundQuestion.id)).filter(
+                    RoundQuestion.round_id == current_round.id
+                ).scalar()
+                
+                # Получаем следующий вопрос (который еще не был показан)
+                round_question = session.query(RoundQuestion).filter(
+                    and_(
+                        RoundQuestion.round_id == current_round.id,
+                        RoundQuestion.displayed_at.is_(None)
+                    )
+                ).order_by(RoundQuestion.question_number).first()
+                
+                if not round_question:
+                    raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
+                
+                # Получаем сам вопрос
+                db_question = session.query(Question).filter(Question.id == round_question.question_id).first()
+                if not db_question:
+                    raise HTTPException(status_code=404, detail="Question not found")
+                
+                # Формируем варианты ответов
+                options = [
+                    {"id": 1, "text": db_question.option_a, "is_correct": db_question.correct_option == 'A'},
+                    {"id": 2, "text": db_question.option_b, "is_correct": db_question.correct_option == 'B'},
+                ]
+                if db_question.option_c:
+                    options.append({"id": 3, "text": db_question.option_c, "is_correct": db_question.correct_option == 'C'})
+                if db_question.option_d:
+                    options.append({"id": 4, "text": db_question.option_d, "is_correct": db_question.correct_option == 'D'})
+                
+                # Если вопрос был перемешан, применяем перемешивание
+                if round_question.shuffled_options:
+                    shuffled = round_question.shuffled_options
+                    # Перемешиваем варианты согласно shuffled_options
+                    shuffled_options = []
+                    for orig_opt in ['A', 'B', 'C', 'D']:
+                        if orig_opt in shuffled:
+                            new_pos = shuffled[orig_opt]
+                            # Находим вариант с оригинальной позицией orig_opt
+                            opt_idx = ord(orig_opt) - ord('A')
+                            if opt_idx < len(options):
+                                shuffled_options.append({
+                                    "id": opt_idx + 1,
+                                    "text": options[opt_idx]["text"],
+                                    "is_correct": new_pos == round_question.correct_option_shuffled
+                                })
+                    options = shuffled_options
+                
+                # Отмечаем вопрос как показанный
+                from datetime import datetime
+                import pytz
+                round_question.displayed_at = datetime.now(pytz.UTC)
+                session.commit()
+                
+                # Формируем ответ
+                question = Question(
+                    id=db_question.id,
+                    text=db_question.question_text,
+                    answers=[Answer(**opt) for opt in options],
+                    category=db_question.theme.name if db_question.theme else None,
+                    difficulty=db_question.difficulty,
+                    time_limit=round_question.time_limit_sec or 10,
+                    created_at=db_question.created_at.isoformat() if db_question.created_at else None
+                )
+                
+                current_question_num = round_question.question_number
+                print(f"Returning question {current_question_num} from round {current_round.round_number}")
+                return QuestionResponse(question=question)
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error getting question from DB: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to mock data
+            pass
+    
+    # Fallback: используем мок-данные
     print(f"BEFORE: current_round_question={current_round_question}")
     print(f"Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
     
-    # Проверяем, не завершен ли раунд ПЕРЕД увеличением счетчика
-    # Если счетчик уже 10, значит 10-й вопрос уже был задан, следующий запрос должен вернуть ошибку
     if current_round_question >= 10:
         print(f"Round already completed. current_round_question={current_round_question}")
         raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
     
-    # Увеличиваем номер текущего вопроса только если раунд не завершен
-    # И только ПЕРЕД возвратом вопроса (после успешной генерации)
     question_data = random.choice(MOCK_QUESTIONS)
     question = Question(**question_data)
     
-    # Увеличиваем счетчик только после успешной генерации вопроса
     current_round_question = current_round_question + 1
     print(f"AFTER: current_round_question={current_round_question}")
     print(f"Returning question ID: {question.id}")
@@ -275,20 +398,90 @@ class AnswerRequest(BaseModel):
     question_id: int
     answer_id: int
     is_correct: bool
+    game_id: Optional[int] = None
+    user_id: Optional[int] = None
+    round_question_id: Optional[int] = None  # ID вопроса в раунде (RoundQuestion.id)
+    selected_option: Optional[str] = None  # 'A', 'B', 'C', 'D'
+    answer_time: Optional[float] = None  # Время ответа в секундах
 
 @app.post("/api/answer")
 async def submit_answer(answer: AnswerRequest):
     """Отправить ответ на вопрос"""
-    # В реальном приложении здесь будет сохранение в БД
-    # Пока симулируем обновление счетчика для текущего пользователя (ID=1)
+    # Если БД доступна и указаны необходимые параметры, сохраняем в БД
+    if DB_MODELS_AVAILABLE and _db_session_factory and answer.game_id and answer.user_id and answer.round_question_id:
+        try:
+            with get_db_session() as session:
+                # Получаем RoundQuestion
+                round_question = session.query(RoundQuestion).filter(
+                    RoundQuestion.id == answer.round_question_id
+                ).first()
+                
+                if not round_question:
+                    raise HTTPException(status_code=404, detail="Round question not found")
+                
+                # Получаем GamePlayer
+                game_player = session.query(GamePlayer).filter(
+                    and_(
+                        GamePlayer.game_id == answer.game_id,
+                        GamePlayer.user_id == answer.user_id
+                    )
+                ).first()
+                
+                if not game_player:
+                    raise HTTPException(status_code=404, detail="Game player not found")
+                
+                # Проверяем, не ответил ли уже пользователь на этот вопрос
+                existing_answer = session.query(AnswerModel).filter(
+                    and_(
+                        AnswerModel.round_question_id == answer.round_question_id,
+                        AnswerModel.user_id == answer.user_id
+                    )
+                ).first()
+                
+                if existing_answer:
+                    # Обновляем существующий ответ
+                    existing_answer.selected_option = answer.selected_option
+                    existing_answer.is_correct = answer.is_correct
+                    existing_answer.answer_time = answer.answer_time
+                    from datetime import datetime
+                    import pytz
+                    existing_answer.answered_at = datetime.now(pytz.UTC)
+                else:
+                    # Создаем новый ответ
+                    from datetime import datetime
+                    import pytz
+                    new_answer = AnswerModel(
+                        game_id=answer.game_id,
+                        round_id=round_question.round_id,
+                        round_question_id=answer.round_question_id,
+                        user_id=answer.user_id,
+                        game_player_id=game_player.id,
+                        selected_option=answer.selected_option,
+                        is_correct=answer.is_correct,
+                        answer_time=answer.answer_time,
+                        answered_at=datetime.now(pytz.UTC)
+                    )
+                    session.add(new_answer)
+                
+                session.commit()
+                print(f"Answer saved: user_id={answer.user_id}, question_id={answer.question_id}, correct={answer.is_correct}")
+                return {"success": True, "correct": answer.is_correct}
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error saving answer to DB: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to mock data
+            pass
+    
+    # Fallback: используем мок-данные
     if answer.is_correct:
-        user_scores[1] = user_scores.get(1, 0) + 1  # Увеличиваем счетчик для текущего пользователя
+        user_scores[1] = user_scores.get(1, 0) + 1
         print(f"User 1 correct answer! New score: {user_scores[1]}")
     
-    # Симулируем ответы других участников на этот же вопрос
-    # В реальности это будет приходить от других клиентов
-    for user_id in range(2, 11):  # Участники с ID от 2 до 10
-        # Симулируем, что каждый участник с вероятностью 70% ответил правильно
+    for user_id in range(2, 11):
         if random.random() < 0.7:
             user_scores[user_id] = user_scores.get(user_id, 0) + 1
     
@@ -296,27 +489,111 @@ async def submit_answer(answer: AnswerRequest):
     return {"success": True, "correct": answer.is_correct}
 
 @app.get("/api/leaderboard", response_model=LeaderboardResponse)
-async def get_leaderboard():
-    """Получить таблицу лидеров"""
+async def get_leaderboard(
+    game_id: Optional[int] = Query(None, description="ID игры"),
+    user_id: Optional[int] = Query(None, description="ID пользователя")
+):
+    """Получить таблицу лидеров для текущего раунда"""
     global current_round_question
     try:
-        # Создаем данные участников с актуальными счетчиками
+        # Если БД доступна и указаны game_id и user_id, используем БД
+        if DB_MODELS_AVAILABLE and _db_session_factory and game_id:
+            with get_db_session() as session:
+                # Получаем текущую игру
+                game = session.query(Game).filter(Game.id == game_id).first()
+                if not game:
+                    raise HTTPException(status_code=404, detail="Game not found")
+                
+                # Получаем текущий раунд
+                current_round = session.query(Round).filter(
+                    and_(
+                        Round.game_id == game_id,
+                        Round.status == 'in_progress'
+                    )
+                ).first()
+                
+                if not current_round:
+                    # Если раунд не активен, берем последний раунд
+                    current_round = session.query(Round).filter(
+                        Round.game_id == game_id
+                    ).order_by(Round.round_number.desc()).first()
+                
+                if not current_round:
+                    raise HTTPException(status_code=404, detail="No rounds found for this game")
+                
+                # Получаем участников игры (не выбывших)
+                game_players = session.query(GamePlayer).filter(
+                    and_(
+                        GamePlayer.game_id == game_id,
+                        GamePlayer.is_eliminated == False,
+                        GamePlayer.left_game == False
+                    )
+                ).all()
+                
+                # Получаем количество правильных ответов для каждого участника в текущем раунде
+                participants_data = []
+                for gp in game_players:
+                    # Считаем правильные ответы в текущем раунде
+                    correct_count = session.query(func.count(AnswerModel.id)).filter(
+                        and_(
+                            AnswerModel.round_id == current_round.id,
+                            AnswerModel.user_id == gp.user_id,
+                            AnswerModel.is_correct == True
+                        )
+                    ).scalar() or 0
+                    
+                    participants_data.append({
+                        "id": gp.user.id,
+                        "name": gp.user.full_name or gp.user.username or f"User {gp.user.id}",
+                        "correct_answers": correct_count,
+                        "avatar": None,
+                        "is_current_user": gp.user_id == user_id if user_id else False
+                    })
+                
+                # Сортируем по убыванию правильных ответов
+                participants_data.sort(key=lambda x: x["correct_answers"], reverse=True)
+                
+                # Получаем текущий номер вопроса
+                if current_round.status == 'in_progress':
+                    current_round_question_obj = session.query(RoundQuestion).filter(
+                        and_(
+                            RoundQuestion.round_id == current_round.id,
+                            RoundQuestion.displayed_at.isnot(None)
+                        )
+                    ).order_by(RoundQuestion.displayed_at.desc()).first()
+                    current_question_num = current_round_question_obj.question_number if current_round_question_obj else 0
+                else:
+                    current_question_num = 10  # Раунд завершен
+                
+                # Получаем общее количество вопросов в раунде
+                total_questions = session.query(func.count(RoundQuestion.id)).filter(
+                    RoundQuestion.round_id == current_round.id
+                ).scalar() or 10
+                
+                participants = [Participant(**p) for p in participants_data]
+                
+                print(f"/api/leaderboard: game_id={game_id}, current_question={current_question_num}, total={total_questions}")
+                
+                return LeaderboardResponse(
+                    participants=participants,
+                    current_question_number=current_question_num,
+                    total_questions=total_questions
+                )
+        
+        # Fallback: используем мок-данные
         participants_data = []
         
         for i, p in enumerate(MOCK_PARTICIPANTS):
-            user_id = p["id"]
-            # Берем актуальный счетчик из хранилища
-            correct_answers = user_scores.get(user_id, 0)
+            user_id_mock = p["id"]
+            correct_answers = user_scores.get(user_id_mock, 0)
             
             participants_data.append({
                 **p,
                 "correct_answers": correct_answers
             })
         
-        # Сортируем по убыванию правильных ответов
         participants_data.sort(key=lambda x: x["correct_answers"], reverse=True)
         
-        # Обновляем ID для правильной сортировки
         for i, p in enumerate(participants_data):
             p["id"] = i + 1
         
@@ -329,6 +606,8 @@ async def get_leaderboard():
             current_question_number=current_round_question,
             total_questions=10
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"ERROR in /api/leaderboard: {e}")
         import traceback
@@ -351,22 +630,51 @@ async def reset_round():
     print(f"=== RESET ROUND COMPLETE ===")
     return {"success": True, "message": "Round reset"}
 
+class LeaveGameRequest(BaseModel):
+    game_id: int
+    user_id: int
+
 @app.post("/api/game/leave")
-async def leave_game():
+async def leave_game(request: LeaveGameRequest):
     """
     Покинуть игру (выход из игры через веб-интерфейс)
-    В будущем здесь будет интеграция с ботом для уведомления о выходе
     """
-    # TODO: Интеграция с реальной БД и ботом
-    # 1. Получить game_id и user_id из запроса (или из сессии/токена)
-    # 2. Обновить статус игрока в БД (left_game = True)
-    # 3. Уведомить бота о выходе игрока
-    # 4. Бот отправит сообщение в Telegram и вернет в главное меню
+    print(f"=== LEAVE GAME CALLED === game_id={request.game_id}, user_id={request.user_id}")
     
-    print("=== LEAVE GAME CALLED ===")
-    print("Player left the game via web interface")
-    # Пока возвращаем успешный ответ
-    # В будущем здесь будет реальная логика
+    # Если БД доступна, обновляем статус игрока
+    if DB_MODELS_AVAILABLE and _db_session_factory:
+        try:
+            with get_db_session() as session:
+                # Получаем GamePlayer
+                game_player = session.query(GamePlayer).filter(
+                    and_(
+                        GamePlayer.game_id == request.game_id,
+                        GamePlayer.user_id == request.user_id
+                    )
+                ).first()
+                
+                if not game_player:
+                    raise HTTPException(status_code=404, detail="Game player not found")
+                
+                # Обновляем статус
+                game_player.left_game = True
+                session.commit()
+                
+                print(f"Player {request.user_id} left game {request.game_id}")
+                # TODO: Уведомить бота о выходе игрока через Redis или другой механизм
+                
+                return {"success": True, "message": "Game left successfully"}
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error leaving game: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Error leaving game: {str(e)}")
+    
+    # Fallback
+    print("Player left the game via web interface (mock)")
     return {"success": True, "message": "Game left successfully"}
 
 if __name__ == "__main__":
