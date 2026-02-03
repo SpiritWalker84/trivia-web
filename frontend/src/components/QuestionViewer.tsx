@@ -6,13 +6,15 @@ import './QuestionViewer.css'
 
 interface QuestionViewerProps {
   questionId: number | null
+  gameId: number | null
+  userId: number | null
   onQuestionChange: (id: number | null) => void
   onRoundComplete?: () => void
   onQuestionLoaded?: () => void // Callback когда вопрос успешно загружен
   showRoundSummary?: boolean // Флаг, что показывается summary раунда
 }
 
-const QuestionViewer = ({ questionId, onQuestionChange, onRoundComplete, onQuestionLoaded, showRoundSummary }: QuestionViewerProps) => {
+const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundComplete, onQuestionLoaded, showRoundSummary }: QuestionViewerProps) => {
   const [question, setQuestion] = useState<Question | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -89,8 +91,13 @@ const QuestionViewer = ({ questionId, onQuestionChange, onRoundComplete, onQuest
     setTimerKey(prev => prev + 1)
 
     try {
-      console.log('📡 fetchRandomQuestion: Making API call to /api/questions/random...')
-      const response = await fetch('/api/questions/random')
+      // Формируем URL с параметрами game_id и user_id
+      const url = new URL('/api/questions/random', window.location.origin)
+      if (gameId) url.searchParams.set('game_id', gameId.toString())
+      if (userId) url.searchParams.set('user_id', userId.toString())
+      
+      console.log(`📡 fetchRandomQuestion: Making API call to ${url.toString()}...`)
+      const response = await fetch(url.toString())
       if (!response.ok) {
         if (response.status === 400) {
           // Раунд завершен, вызываем callback для показа summary
@@ -194,7 +201,21 @@ const QuestionViewer = ({ questionId, onQuestionChange, onRoundComplete, onQuest
   }
 
   const sendAnswer = async (questionId: number, answerId: number, isCorrect: boolean) => {
+    if (!gameId || !userId) {
+      console.warn('⚠️ sendAnswer: game_id or user_id missing, skipping answer submission')
+      return
+    }
+    
     try {
+      // Определяем выбранный вариант ответа (A, B, C, D)
+      const selectedAnswer = question?.answers.find(a => a.id === answerId)
+      const optionLetter = selectedAnswer 
+        ? ['A', 'B', 'C', 'D'][question.answers.findIndex(a => a.id === answerId)]
+        : null
+      
+      // Вычисляем время ответа (примерно, так как точное время нужно отслеживать отдельно)
+      const answerTime = question ? (question.time_limit || 10) : null
+      
       const response = await fetch('/api/answer', {
         method: 'POST',
         headers: {
@@ -204,12 +225,19 @@ const QuestionViewer = ({ questionId, onQuestionChange, onRoundComplete, onQuest
           question_id: questionId,
           answer_id: answerId,
           is_correct: isCorrect,
+          game_id: gameId,
+          user_id: userId,
+          selected_option: optionLetter,
+          answer_time: answerTime,
+          // round_question_id будет получен из API при следующем запросе вопроса
         }),
       })
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
+      
+      console.log('✅ Answer submitted successfully')
     } catch (error) {
       console.error('Failed to send answer:', error)
     }

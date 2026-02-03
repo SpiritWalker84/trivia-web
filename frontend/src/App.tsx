@@ -6,7 +6,21 @@ import RoundSummary from './components/RoundSummary'
 import { Participant } from './types/question'
 import './App.css'
 
+// Получаем game_id и user_id из URL параметров
+function getUrlParams(): { gameId: number | null; userId: number | null } {
+  const params = new URLSearchParams(window.location.search)
+  const gameId = params.get('game_id')
+  const userId = params.get('user_id')
+  return {
+    gameId: gameId ? parseInt(gameId, 10) : null,
+    userId: userId ? parseInt(userId, 10) : null,
+  }
+}
+
 function App() {
+  // Получаем game_id и user_id из URL при загрузке
+  const { gameId, userId } = getUrlParams()
+  
   const [questionId, setQuestionId] = useState<number | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
@@ -15,10 +29,23 @@ function App() {
   const [roundNumber, setRoundNumber] = useState(1)
   const [totalRounds] = useState(9)
   const [roundCompleted, setRoundCompleted] = useState(false) // Флаг завершения раунда
+  
+  // Логируем полученные параметры
+  useEffect(() => {
+    console.log(`🎮 App initialized: game_id=${gameId}, user_id=${userId}`)
+    if (!gameId || !userId) {
+      console.warn('⚠️ game_id or user_id missing from URL. Using mock data fallback.')
+    }
+  }, [gameId, userId])
 
   // Выход из игры
   const handleLeaveGame = async () => {
     if (!confirm('Вы уверены, что хотите покинуть игру?')) {
+      return
+    }
+    
+    if (!gameId || !userId) {
+      alert('Ошибка: не указаны game_id или user_id. Невозможно покинуть игру.')
       return
     }
     
@@ -28,6 +55,10 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          game_id: gameId,
+          user_id: userId,
+        }),
       })
       
       if (response.ok) {
@@ -47,7 +78,12 @@ function App() {
   // Загрузка таблицы лидеров из API
   const fetchLeaderboard = async (updateQuestionNumber: boolean = true) => {
     try {
-      const response = await fetch('/api/leaderboard', {
+      // Формируем URL с параметрами game_id и user_id
+      const url = new URL('/api/leaderboard', window.location.origin)
+      if (gameId) url.searchParams.set('game_id', gameId.toString())
+      if (userId) url.searchParams.set('user_id', userId.toString())
+      
+      const response = await fetch(url.toString(), {
         cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache',
@@ -181,6 +217,8 @@ function App() {
         <main className="app-main">
           <QuestionViewer 
             questionId={questionId} 
+            gameId={gameId}
+            userId={userId}
             onQuestionChange={handleQuestionChange}
             onRoundComplete={() => {
               console.log('📊 App: onRoundComplete called, round is completed')
