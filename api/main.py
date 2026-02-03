@@ -13,19 +13,19 @@ from sqlalchemy import create_engine, func, and_, select
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 
-# Попытка импортировать модели из trivia-bot (если доступны)
+# Импорт моделей БД из shared
 try:
-    # Добавляем путь к trivia-bot в sys.path
-    trivia_bot_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'trivia-bot')
-    if os.path.exists(trivia_bot_path) and trivia_bot_path not in sys.path:
-        sys.path.insert(0, trivia_bot_path)
+    # Добавляем путь к shared в sys.path
+    shared_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'shared')
+    if shared_path not in sys.path:
+        sys.path.insert(0, shared_path)
     
-    from database.models import (
+    from db_models import (
         Game, GamePlayer, Round, RoundQuestion, Question, Answer as AnswerModel,
         User, Theme
     )
     DB_MODELS_AVAILABLE = True
-    print("Database models imported successfully from trivia-bot")
+    print("Database models imported successfully from shared/db_models.py")
 except ImportError as e:
     print(f"Could not import database models: {e}")
     print("Will use mock data")
