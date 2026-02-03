@@ -45,7 +45,31 @@ git clone <your-repo-url> megagames
 cd megagames/trivia-web
 ```
 
-### Шаг 3: Создание .env файла
+### Шаг 3: Миграция данных (если есть существующая БД)
+
+**⚠️ ВАЖНО:** Если у вас уже есть БД на сервере (где работает бот), нужно перенести данные в Docker контейнер!
+
+**Подробная инструкция:** [MIGRATION_STEPS.md](MIGRATION_STEPS.md)
+
+**Быстрый способ:**
+
+```bash
+# 1. Экспорт данных из существующей БД
+export PGPASSWORD=trivia_password
+pg_dump -h localhost -p 5432 -U trivia_user -d trivia_bot -f trivia_backup.sql
+
+# 2. Запустить только PostgreSQL контейнер
+docker compose up -d postgres
+sleep 15
+
+# 3. Импорт данных в контейнер
+cat trivia_backup.sql | docker compose exec -T postgres psql -U trivia_user -d trivia_bot
+
+# 4. Проверка
+docker compose exec postgres psql -U trivia_user -d trivia_bot -c "SELECT COUNT(*) FROM questions;"
+```
+
+### Шаг 4: Создание .env файла
 
 ```bash
 # Создайте .env файл в корне trivia-web/
@@ -58,16 +82,17 @@ TELEGRAM_BOT_TOKEN=your_actual_bot_token_here
 TELEGRAM_ADMIN_IDS=123456789,987654321
 ENVIRONMENT=production
 
-# Database Configuration (как в trivia-bot)
-DATABASE_URL=postgresql://trivia_user:trivia_password@localhost:5432/trivia_bot
+# Database Configuration
+# При использовании Docker Compose, DATABASE_URL автоматически указывает на контейнер postgres
+# Если нужно использовать внешнюю БД, раскомментируйте и укажите:
+# DATABASE_URL=postgresql://trivia_user:trivia_password@localhost:5432/trivia_bot
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 ```
 
 **Важно:** 
-- Если используете Docker Compose, `DATABASE_URL` будет автоматически указывать на контейнер `postgres`
-- Если используете внешнюю БД (как в trivia-bot), укажите полный URL: `postgresql://user:password@host:5432/dbname`
-- API автоматически подключится к БД, если `DATABASE_URL` указан, иначе будет использовать моковые данные
+- При использовании Docker Compose, `DATABASE_URL` в `.env` **не нужен** - он автоматически настроен в `docker-compose.yml` на контейнер `postgres`
+- Если хотите использовать внешнюю БД (не в Docker), укажите `DATABASE_URL` в `.env`
 
 **⚠️ ВАЖНО:** Не коммитьте `.env` в Git! Он уже в `.gitignore`.
 
