@@ -36,7 +36,7 @@ try:
         User, Theme
     )
     DB_MODELS_AVAILABLE = True
-    print(f"Database models imported successfully from shared/db_models.py (path: {shared_path or 'found'})")
+    print(f"Database models imported successfully from shared/db_models.py (path: {shared_path if shared_path else 'found'})")
 except ImportError as e:
     print(f"Could not import database models: {e}")
     print(f"Python path: {sys.path}")
