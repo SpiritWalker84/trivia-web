@@ -10,7 +10,7 @@ interface RoundSummaryProps {
   onLeaveGame?: () => void
 }
 
-const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: RoundSummaryProps) => {
+const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onLeaveGame }: RoundSummaryProps) => {
   const sortedParticipants = [...participants].sort((a, b) => b.correct_answers - a.correct_answers)
   
   // Определяем выбывшего игрока - только один, кто занял последнее место (последний в отсортированном списке)

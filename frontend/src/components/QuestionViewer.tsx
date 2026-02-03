@@ -19,7 +19,7 @@ const QuestionViewer = ({ questionId, onQuestionChange, onRoundComplete, onQuest
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [timerKey, setTimerKey] = useState(0)
-  const nextQuestionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const nextQuestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isNextQuestionScheduled = useRef(false)
   const hasInitialQuestionLoaded = useRef(false)
 

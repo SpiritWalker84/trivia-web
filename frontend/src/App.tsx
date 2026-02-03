@@ -11,10 +11,9 @@ function App() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [totalQuestions, setTotalQuestions] = useState(10)
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
   const [showRoundSummary, setShowRoundSummary] = useState(false)
   const [roundNumber, setRoundNumber] = useState(1)
-  const [totalRounds, setTotalRounds] = useState(9)
+  const [totalRounds] = useState(9)
   const [roundCompleted, setRoundCompleted] = useState(false) // Флаг завершения раунда
 
   // Выход из игры
@@ -90,8 +89,6 @@ function App() {
       }
     } catch (error) {
       console.error('Error fetching leaderboard:', error)
-    } finally {
-      setLoadingLeaderboard(false)
     }
   }
 

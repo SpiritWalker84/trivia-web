@@ -9,7 +9,7 @@ interface LeaderboardProps {
   totalQuestions?: number
 }
 
-const Leaderboard = ({ participants, currentQuestionNumber, totalQuestions }: LeaderboardProps) => {
+const Leaderboard = ({ participants }: LeaderboardProps) => {
   const [sortedParticipants, setSortedParticipants] = useState<Participant[]>([])
 
   useEffect(() => {
