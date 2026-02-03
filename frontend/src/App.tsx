@@ -146,34 +146,6 @@ function App() {
     )
   }
 
-  // Выход из игры
-  const handleLeaveGame = async () => {
-    if (!confirm('Вы уверены, что хотите покинуть игру?')) {
-      return
-    }
-    
-    try {
-      const response = await fetch('/api/game/leave', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      if (response.ok) {
-        // Игра покинута, можно закрыть окно или показать сообщение
-        alert('Вы покинули игру. Вернитесь в Telegram для продолжения.')
-        // Опционально: можно закрыть окно, если оно было открыто из бота
-        // window.close()
-      } else {
-        throw new Error('Не удалось покинуть игру')
-      }
-    } catch (error) {
-      console.error('Error leaving game:', error)
-      alert('Ошибка при выходе из игры. Попробуйте еще раз.')
-    }
-  }
-
   return (
     <div className="app">
       <header className="app-header">
