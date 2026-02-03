@@ -4,9 +4,67 @@ from typing import List, Optional
 from pydantic import BaseModel
 import random
 import time
+import os
 from collections import defaultdict
+from dotenv import load_dotenv
+from contextlib import contextmanager
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import QueuePool
+
+# Загружаем переменные окружения из .env
+load_dotenv()
 
 app = FastAPI(title="Trivia Web API", version="0.1.0")
+
+# Настройка подключения к БД (если указан DATABASE_URL)
+DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "10"))
+DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "20"))
+
+_db_engine = None
+_db_session_factory = None
+
+def init_database():
+    """Инициализация подключения к БД, если указан DATABASE_URL"""
+    global _db_engine, _db_session_factory
+    if DATABASE_URL:
+        print(f"Connecting to database: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'configured'}")
+        _db_engine = create_engine(
+            DATABASE_URL,
+            poolclass=QueuePool,
+            pool_size=DATABASE_POOL_SIZE,
+            max_overflow=DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=True,
+            echo=False,
+        )
+        _db_session_factory = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=_db_engine
+        )
+        print("Database connection initialized")
+    else:
+        print("DATABASE_URL not set, using mock data")
+
+@contextmanager
+def get_db_session():
+    """Получить сессию БД (если БД настроена)"""
+    if _db_session_factory:
+        session = _db_session_factory()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+    else:
+        yield None
+
+# Инициализируем БД при старте
+init_database()
 
 # Настройка CORS для работы с фронтендом
 # В продакшене фронтенд и API находятся в одной Docker сети, поэтому разрешаем все источники

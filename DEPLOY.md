@@ -57,9 +57,17 @@ nano .env
 TELEGRAM_BOT_TOKEN=your_actual_bot_token_here
 TELEGRAM_ADMIN_IDS=123456789,987654321
 ENVIRONMENT=production
+
+# Database Configuration (как в trivia-bot)
+DATABASE_URL=postgresql://trivia_user:trivia_password@localhost:5432/trivia_bot
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 ```
+
+**Важно:** 
+- Если используете Docker Compose, `DATABASE_URL` будет автоматически указывать на контейнер `postgres`
+- Если используете внешнюю БД (как в trivia-bot), укажите полный URL: `postgresql://user:password@host:5432/dbname`
+- API автоматически подключится к БД, если `DATABASE_URL` указан, иначе будет использовать моковые данные
 
 **⚠️ ВАЖНО:** Не коммитьте `.env` в Git! Он уже в `.gitignore`.
 

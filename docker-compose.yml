@@ -120,7 +120,9 @@ services:
       dockerfile: docker/Dockerfile.api
     container_name: trivia-api
     environment:
-      - DATABASE_URL=postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot
+      - DATABASE_URL=${DATABASE_URL:-postgresql://trivia_user:trivia_password@postgres:5432/trivia_bot}
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
       - REDIS_URL=redis://redis:6379/0
       - PYTHONUNBUFFERED=1
     ports:
