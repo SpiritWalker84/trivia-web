@@ -16,18 +16,30 @@ from sqlalchemy.pool import QueuePool
 # Импорт моделей БД из shared
 try:
     # Добавляем путь к shared в sys.path
-    shared_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'shared')
-    if shared_path not in sys.path:
-        sys.path.insert(0, shared_path)
+    # В Docker контейнере shared будет в /app/shared/, локально в ../shared/
+    current_dir = os.path.dirname(__file__)  # /app/ в Docker, api/ локально
+    shared_paths = [
+        os.path.join(current_dir, 'shared'),  # /app/shared/ в Docker
+        os.path.join(os.path.dirname(current_dir), 'shared'),  # ../shared/ локально
+    ]
+    
+    shared_path = None
+    for path in shared_paths:
+        if os.path.exists(path):
+            shared_path = path
+            if path not in sys.path:
+                sys.path.insert(0, path)
+            break
     
     from db_models import (
         Game, GamePlayer, Round, RoundQuestion, Question, Answer as AnswerModel,
         User, Theme
     )
     DB_MODELS_AVAILABLE = True
-    print("Database models imported successfully from shared/db_models.py")
+    print(f"Database models imported successfully from shared/db_models.py (path: {shared_path or 'found'})")
 except ImportError as e:
     print(f"Could not import database models: {e}")
+    print(f"Python path: {sys.path}")
     print("Will use mock data")
     DB_MODELS_AVAILABLE = False
     Game = GamePlayer = Round = RoundQuestion = Question = AnswerModel = User = Theme = None

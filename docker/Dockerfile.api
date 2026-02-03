@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем код приложения
 COPY api/ .
+# Копируем shared модули в /app/shared/
+COPY shared/ ./shared/
 
 # Открываем порт
 EXPOSE 8000
