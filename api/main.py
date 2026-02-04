@@ -142,6 +142,7 @@ class Participant(BaseModel):
     avatar: Optional[str] = None
     is_current_user: Optional[bool] = False
     is_eliminated: Optional[bool] = False
+    total_time: Optional[float] = 0.0  # Общее время ответов в раунде (в секундах)
 
 class LeaderboardResponse(BaseModel):
     participants: List[Participant]
@@ -672,13 +673,24 @@ async def get_leaderboard(
                     # Логируем для отладки
                     if is_eliminated:
                         print(f"Leaderboard API: Player {gp.user.id} ({gp.user.full_name or gp.user.username}) is eliminated (GamePlayer.id={gp.id}, is_eliminated={gp.is_eliminated})")
+                    
+                    # Считаем общее время ответов в текущем раунде
+                    total_time = session.query(func.sum(AnswerModel.answer_time)).filter(
+                        and_(
+                            AnswerModel.round_id == current_round.id,
+                            AnswerModel.user_id == gp.user_id,
+                            AnswerModel.answer_time.isnot(None)
+                        )
+                    ).scalar() or 0.0
+                    
                     participants_data.append({
                         "id": gp.user.id,
                         "name": gp.user.full_name or gp.user.username or f"User {gp.user.id}",
                         "correct_answers": correct_count,
                         "avatar": None,
                         "is_current_user": gp.user_id == user_id if user_id else False,
-                        "is_eliminated": is_eliminated
+                        "is_eliminated": is_eliminated,
+                        "total_time": float(total_time)
                     })
                 
                 # Сортируем по убыванию правильных ответов

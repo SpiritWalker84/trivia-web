@@ -27,6 +27,7 @@ export interface Participant {
   avatar?: string
   is_current_user?: boolean
   is_eliminated?: boolean // Флаг выбывшего игрока
+  total_time?: number // Общее время ответов в раунде (в секундах)
 }
 
 export interface LeaderboardData {

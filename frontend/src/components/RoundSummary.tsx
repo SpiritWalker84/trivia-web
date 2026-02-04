@@ -165,8 +165,16 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
                       )}
                     </div>
                   </div>
-                  <div className="card-score">
-                    {participant.correct_answers}
+                  <div className="card-stats">
+                    <div className="card-score">
+                      {participant.correct_answers}
+                    </div>
+                    {participant.total_time !== undefined && (
+                      <div className="card-time">
+                        <span className="time-icon">⏱️</span>
+                        <span className="time-value">{Math.round(participant.total_time)}с</span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
