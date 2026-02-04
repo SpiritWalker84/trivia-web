@@ -539,6 +539,11 @@ async def get_leaderboard(
                 # Получаем количество правильных ответов для каждого участника в текущем раунде
                 participants_data = []
                 for gp in game_players:
+                    # Проверяем, что у GamePlayer есть связанный User
+                    if not gp.user:
+                        print(f"Warning: GamePlayer {gp.id} has no associated user, skipping")
+                        continue
+                    
                     # Считаем правильные ответы в текущем раунде
                     correct_count = session.query(func.count(AnswerModel.id)).filter(
                         and_(

@@ -13,7 +13,9 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
   const [sortedParticipants, setSortedParticipants] = useState<Participant[]>([])
 
   useEffect(() => {
-    const sorted = [...participants].sort((a, b) => b.correct_answers - a.correct_answers)
+    // Фильтруем участников, у которых есть id и валидные данные
+    const validParticipants = participants.filter(p => p && p.id && p.name)
+    const sorted = [...validParticipants].sort((a, b) => b.correct_answers - a.correct_answers)
     setSortedParticipants(sorted)
   }, [participants])
 
