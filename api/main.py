@@ -664,14 +664,17 @@ async def get_leaderboard(
                         )
                     ).scalar() or 0
                     
+                    is_eliminated = gp.is_eliminated or False
                     participants_data.append({
                         "id": gp.user.id,
                         "name": gp.user.full_name or gp.user.username or f"User {gp.user.id}",
                         "correct_answers": correct_count,
                         "avatar": None,
                         "is_current_user": gp.user_id == user_id if user_id else False,
-                        "is_eliminated": gp.is_eliminated
+                        "is_eliminated": is_eliminated
                     })
+                    if is_eliminated:
+                        print(f"Leaderboard: Player {gp.user.id} ({gp.user.full_name or gp.user.username}) is eliminated")
                 
                 # Сортируем по убыванию правильных ответов
                 participants_data.sort(key=lambda x: x["correct_answers"], reverse=True)

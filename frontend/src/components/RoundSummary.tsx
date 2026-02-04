@@ -75,6 +75,14 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
   // Разделяем на активных и выбывших
   const activeParticipants = sortedParticipants.filter(p => !p.is_eliminated)
   const eliminatedParticipants = sortedParticipants.filter(p => p.is_eliminated)
+  
+  // Логирование для отладки
+  console.log('RoundSummary: Participants:', {
+    total: sortedParticipants.length,
+    active: activeParticipants.length,
+    eliminated: eliminatedParticipants.length,
+    eliminatedList: eliminatedParticipants.map(p => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated }))
+  })
 
   const getRankIcon = (index: number) => {
     if (index === 0) return '🥇'

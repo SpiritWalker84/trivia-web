@@ -24,6 +24,13 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
       // Внутри группы сортируем по очкам
       return b.correct_answers - a.correct_answers
     })
+    
+    // Логирование для отладки
+    const eliminated = sorted.filter(p => p.is_eliminated)
+    if (eliminated.length > 0) {
+      console.log('Leaderboard: Found eliminated participants:', eliminated.map(p => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated })))
+    }
+    
     setSortedParticipants(sorted)
   }, [participants])
 
