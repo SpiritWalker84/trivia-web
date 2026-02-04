@@ -248,7 +248,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
   }
 
-  const handleTimeUp = () => {
+  const handleTimeUp = useCallback(() => {
     // Не обрабатываем, если показывается summary раунда
     if (showRoundSummary) {
       console.log('handleTimeUp: Skipping (round summary is showing)')
@@ -292,7 +292,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       isNextQuestionScheduled.current = false
       fetchRandomQuestion()
     }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
-  }
+  }, [question, showResult, showRoundSummary])
 
   // Передаем handleTimeUp в родительский компонент через callback
   useEffect(() => {
