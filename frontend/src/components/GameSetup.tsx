@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import './GameSetup.css'
 
@@ -9,7 +9,7 @@ interface GameSetupProps {
 }
 
 export interface GameSettings {
-  gameType: 'quick' | 'training' | 'private'
+  gameType: 'training' | 'private'
   totalRounds: number
   themeId: number | null
   playerName: string
@@ -17,20 +17,44 @@ export interface GameSettings {
 
 const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProps) => {
   const [playerName, setPlayerName] = useState(initialPlayerName || '')
-  const [gameType, setGameType] = useState<'quick' | 'training' | 'private'>('quick')
-  const [totalRounds, setTotalRounds] = useState(9)
-  const [themeId, setThemeId] = useState<number | null>(null)
+  const [gameType, setGameType] = useState<'training' | 'private'>('training')
+  const [isLoadingName, setIsLoadingName] = useState(!!telegramId && !initialPlayerName)
+
+  // Загружаем имя пользователя, если есть telegram_id
+  useEffect(() => {
+    if (telegramId && !initialPlayerName) {
+      fetch(`/api/user/info?telegram_id=${telegramId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.exists && data.full_name) {
+            setPlayerName(data.full_name)
+          } else {
+            // Если пользователя нет, создадим с дефолтным именем
+            setPlayerName(`Игрок ${telegramId}`)
+          }
+          setIsLoadingName(false)
+        })
+        .catch(err => {
+          console.warn('Failed to load user info:', err)
+          setPlayerName(`Игрок ${telegramId}`)
+          setIsLoadingName(false)
+        })
+    } else if (initialPlayerName) {
+      setPlayerName(initialPlayerName)
+      setIsLoadingName(false)
+    }
+  }, [telegramId, initialPlayerName])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!playerName.trim()) {
-      alert('Пожалуйста, введите ваше имя')
+      alert('Пожалуйста, подождите, загружается информация о пользователе')
       return
     }
     onStartGame({
       gameType,
-      totalRounds,
-      themeId,
+      totalRounds: 9, // Фиксированное количество раундов
+      themeId: null, // Смешанная тема
       playerName: playerName.trim()
     })
   }
@@ -44,59 +68,65 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
     >
       <div className="game-setup-header">
         <h1>🎮 Brain Survivor</h1>
-        <p>Настройте игру и начните играть!</p>
+        <p>Выберите тип игры</p>
       </div>
 
       <form onSubmit={handleSubmit} className="game-setup-form">
-        <div className="form-group">
-          <label htmlFor="playerName">Ваше имя *</label>
-          <input
-            id="playerName"
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Введите ваше имя"
-            required
-            maxLength={50}
-          />
-        </div>
+        {telegramId && (
+          <div className="form-group">
+            <label>Игрок</label>
+            <div className="player-name-display">
+              {isLoadingName ? (
+                <span className="loading-text">Загрузка...</span>
+              ) : (
+                <span className="player-name">{playerName}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!telegramId && (
+          <div className="form-group">
+            <label htmlFor="playerName">Ваше имя *</label>
+            <input
+              id="playerName"
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Введите ваше имя"
+              required
+              maxLength={50}
+            />
+          </div>
+        )}
 
         <div className="form-group">
-          <label htmlFor="gameType">Тип игры</label>
-          <select
-            id="gameType"
-            value={gameType}
-            onChange={(e) => setGameType(e.target.value as 'quick' | 'training' | 'private')}
-          >
-            <option value="quick">Быстрая игра</option>
-            <option value="training">Тренировка</option>
-            <option value="private">Приватная игра</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="totalRounds">Количество раундов</label>
-          <input
-            id="totalRounds"
-            type="number"
-            value={totalRounds}
-            onChange={(e) => setTotalRounds(parseInt(e.target.value) || 9)}
-            min={1}
-            max={20}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="themeId">Тема (опционально)</label>
-          <select
-            id="themeId"
-            value={themeId || ''}
-            onChange={(e) => setThemeId(e.target.value ? parseInt(e.target.value) : null)}
-          >
-            <option value="">Смешанная</option>
-            {/* TODO: Загрузить темы из API */}
-          </select>
+          <label htmlFor="gameType">Тип игры *</label>
+          <div className="game-type-buttons">
+            <motion.button
+              type="button"
+              className={`game-type-btn ${gameType === 'training' ? 'active' : ''}`}
+              onClick={() => setGameType('training')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="game-type-icon">🤖</span>
+              <span className="game-type-title">Тренировка с ботами</span>
+              <span className="game-type-desc">Играйте против ботов разной сложности</span>
+            </motion.button>
+            
+            <motion.button
+              type="button"
+              className={`game-type-btn ${gameType === 'private' ? 'active' : ''}`}
+              onClick={() => setGameType('private')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="game-type-icon">👥</span>
+              <span className="game-type-title">Игра с друзьями</span>
+              <span className="game-type-desc">Пригласите друзей из Telegram</span>
+            </motion.button>
+          </div>
         </div>
 
         <motion.button

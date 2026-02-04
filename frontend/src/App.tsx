@@ -145,64 +145,21 @@ function App() {
   // Загружаем информацию о пользователе, если есть telegram_id
   const [userInfo, setUserInfo] = useState<{ full_name?: string } | null>(null)
   
-  // Автоматически создаем игру при загрузке, если есть telegram_id
+  // Загружаем информацию о пользователе при загрузке, если есть telegram_id
   useEffect(() => {
-    if (telegramId && !gameId && !isCreatingGame) {
-      console.log('🚀 Auto-creating game for telegram_id:', telegramId)
-      setIsCreatingGame(true)
-      
-      // Загружаем информацию о пользователе
+    if (telegramId && !userInfo) {
       fetch(`/api/user/info?telegram_id=${telegramId}`)
         .then(res => res.json())
-        .then(async (data) => {
+        .then(data => {
           const playerName = data.exists && data.full_name ? data.full_name : `Игрок ${telegramId}`
           setUserInfo({ full_name: playerName })
-          
-          // Автоматически создаем игру с дефолтными настройками
-          try {
-            const response = await fetch('/api/game/create', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                game_type: 'quick',
-                theme_id: null,
-                total_rounds: 9,
-                player_name: playerName,
-                player_telegram_id: telegramId,
-              }),
-            })
-            
-            if (!response.ok) {
-              throw new Error('Failed to create game')
-            }
-            
-            const gameData = await response.json()
-            console.log('✅ Game auto-created:', gameData)
-            
-            setGameId(gameData.game_id)
-            setUserId(gameData.user_id)
-            setTotalRounds(gameData.total_rounds)
-            setShowGameSetup(false)
-            
-            // Создаем и запускаем первый раунд
-            await createAndStartRound(gameData.game_id, 1)
-          } catch (error) {
-            console.error('Error auto-creating game:', error)
-            // Если не удалось создать игру, показываем setup
-            setShowGameSetup(true)
-          } finally {
-            setIsCreatingGame(false)
-          }
         })
         .catch(err => {
-          console.error('Failed to load user info or create game:', err)
-          setShowGameSetup(true)
-          setIsCreatingGame(false)
+          console.warn('Failed to load user info:', err)
+          setUserInfo({ full_name: `Игрок ${telegramId}` })
         })
     }
-  }, [telegramId, gameId, isCreatingGame])
+  }, [telegramId, userInfo])
   
   // Логируем полученные параметры
   useEffect(() => {
@@ -352,25 +309,7 @@ function App() {
     await createAndStartRound(gameId, nextRoundNumber)
   }
 
-  // Показываем экран загрузки, если игра создается автоматически
-  if (isCreatingGame || (telegramId && !gameId)) {
-    return (
-      <div className="app">
-        <div className="loading-screen">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h2>🎮 Загрузка игры...</h2>
-            <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Подождите, игра создается</p>
-          </motion.div>
-        </div>
-      </div>
-    )
-  }
-  
-  // Показываем экран настройки игры, если нет telegram_id и игра не создана
+  // Показываем экран настройки игры, если игра не создана
   if (showGameSetup) {
     return (
       <div className="app">
