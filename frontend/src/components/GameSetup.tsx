@@ -4,6 +4,8 @@ import './GameSetup.css'
 
 interface GameSetupProps {
   onStartGame: (settings: GameSettings) => void
+  telegramId?: number | null  // Если пользователь пришел из бота
+  initialPlayerName?: string  // Имя из бота (если есть)
 }
 
 export interface GameSettings {
@@ -13,8 +15,8 @@ export interface GameSettings {
   playerName: string
 }
 
-const GameSetup = ({ onStartGame }: GameSetupProps) => {
-  const [playerName, setPlayerName] = useState('')
+const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProps) => {
+  const [playerName, setPlayerName] = useState(initialPlayerName || '')
   const [gameType, setGameType] = useState<'quick' | 'training' | 'private'>('quick')
   const [totalRounds, setTotalRounds] = useState(9)
   const [themeId, setThemeId] = useState<number | null>(null)

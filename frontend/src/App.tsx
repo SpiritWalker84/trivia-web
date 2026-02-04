@@ -7,25 +7,32 @@ import GameSetup, { GameSettings } from './components/GameSetup'
 import { Participant } from './types/question'
 import './App.css'
 
-// Получаем game_id и user_id из URL параметров (для обратной совместимости с ботом)
-function getUrlParams(): { gameId: number | null; userId: number | null } {
+// Получаем параметры из URL (telegram_id от бота, или game_id/user_id для обратной совместимости)
+function getUrlParams(): { 
+  telegramId: number | null
+  gameId: number | null
+  userId: number | null
+} {
   const params = new URLSearchParams(window.location.search)
+  const telegramId = params.get('telegram_id')
   const gameId = params.get('game_id')
   const userId = params.get('user_id')
   return {
+    telegramId: telegramId ? parseInt(telegramId, 10) : null,
     gameId: gameId ? parseInt(gameId, 10) : null,
     userId: userId ? parseInt(userId, 10) : null,
   }
 }
 
 function App() {
-  // Получаем game_id и user_id из URL при загрузке (для обратной совместимости)
-  const { gameId: urlGameId, userId: urlUserId } = getUrlParams()
+  // Получаем параметры из URL
+  const { telegramId, gameId: urlGameId, userId: urlUserId } = getUrlParams()
   
   // Состояние игры
   const [gameId, setGameId] = useState<number | null>(urlGameId)
   const [userId, setUserId] = useState<number | null>(urlUserId)
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null)
+  // Показываем setup, если нет активной игры (даже если есть telegram_id - пользователь может настроить игру)
   const [showGameSetup, setShowGameSetup] = useState(!urlGameId || !urlUserId)
   
   const [questionId, setQuestionId] = useState<number | null>(null)
@@ -44,6 +51,7 @@ function App() {
     
     try {
       // Создаем игру через API
+      // Если есть telegram_id из URL (пользователь пришел из бота), используем его
       const response = await fetch('/api/game/create', {
         method: 'POST',
         headers: {
@@ -54,7 +62,7 @@ function App() {
           theme_id: settings.themeId,
           total_rounds: settings.totalRounds,
           player_name: settings.playerName,
-          player_telegram_id: null, // Для standalone frontend
+          player_telegram_id: telegramId, // Используем telegram_id, если пользователь пришел из бота
         }),
       })
       
@@ -133,13 +141,32 @@ function App() {
     }
   }
   
+  // Загружаем информацию о пользователе, если есть telegram_id
+  const [userInfo, setUserInfo] = useState<{ full_name?: string } | null>(null)
+  
+  useEffect(() => {
+    if (telegramId && showGameSetup) {
+      // Загружаем информацию о пользователе для предзаполнения формы
+      fetch(`/api/user/info?telegram_id=${telegramId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.exists && data.full_name) {
+            setUserInfo({ full_name: data.full_name })
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load user info:', err)
+        })
+    }
+  }, [telegramId, showGameSetup])
+  
   // Логируем полученные параметры
   useEffect(() => {
-    console.log(`🎮 App initialized: game_id=${gameId}, user_id=${userId}`)
+    console.log(`🎮 App initialized: game_id=${gameId}, user_id=${userId}, telegram_id=${telegramId}`)
     if (!gameId || !userId) {
       console.log('ℹ️ No game_id or user_id in URL. Will show game setup.')
     }
-  }, [gameId, userId])
+  }, [gameId, userId, telegramId])
 
   // Выход из игры
   const handleLeaveGame = async () => {
@@ -285,7 +312,11 @@ function App() {
   if (showGameSetup) {
     return (
       <div className="app">
-        <GameSetup onStartGame={handleStartGame} />
+        <GameSetup 
+          onStartGame={handleStartGame} 
+          telegramId={telegramId}
+          initialPlayerName={userInfo?.full_name}
+        />
       </div>
     )
   }

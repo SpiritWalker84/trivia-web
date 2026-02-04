@@ -973,6 +973,38 @@ async def mark_question_displayed(request: MarkQuestionDisplayedRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error marking question: {str(e)}")
 
+@app.get("/api/user/info")
+async def get_user_info(telegram_id: Optional[int] = Query(None, description="Telegram ID пользователя")):
+    """
+    Получить информацию о пользователе по telegram_id (для предзаполнения формы)
+    """
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="telegram_id is required")
+    
+    try:
+        with get_db_session() as session:
+            user = session.query(User).filter(User.telegram_id == telegram_id).first()
+            
+            if not user:
+                return {"exists": False}
+            
+            return {
+                "exists": True,
+                "user_id": user.id,
+                "username": user.username,
+                "full_name": user.full_name,
+                "is_bot": user.is_bot
+            }
+            
+    except Exception as e:
+        print(f"Error getting user info: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting user info: {str(e)}")
+
 @app.post("/api/game/leave")
 async def leave_game(request: LeaveGameRequest):
     """
