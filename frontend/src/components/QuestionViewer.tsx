@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Question, Answer } from '../types/question'
 import Timer from './Timer'
@@ -28,13 +28,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const hasInitialQuestionLoaded = useRef(false)
   const questionLoadTimeRef = useRef<number | null>(null) // Время загрузки вопроса
   const previousQuestionIdRef = useRef<number | null>(null) // Предыдущий questionId для отслеживания изменений
-
-  // Передаем handleTimeUp в родительский компонент через callback
-  useEffect(() => {
-    if (onTimerTimeUp) {
-      onTimerTimeUp(handleTimeUp)
-    }
-  }, [onTimerTimeUp, question, showResult, showRoundSummary])
 
   useEffect(() => {
     // Не загружаем вопросы, если показывается summary раунда
