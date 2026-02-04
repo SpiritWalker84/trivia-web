@@ -25,6 +25,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const nextQuestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isNextQuestionScheduled = useRef(false)
   const hasInitialQuestionLoaded = useRef(false)
+  const questionLoadTimeRef = useRef<number | null>(null) // Время загрузки вопроса
 
   useEffect(() => {
     // Не загружаем вопросы, если показывается summary раунда
@@ -173,6 +174,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       
       setQuestion(data.question)
       setRoundQuestionId(data.round_question_id || null)
+      // Сохраняем время загрузки вопроса для вычисления времени ответа
+      questionLoadTimeRef.current = Date.now()
       
       // Отмечаем вопрос как показанный (для standalone frontend)
       if (data.round_question_id) {
@@ -293,8 +296,12 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         ? ['A', 'B', 'C', 'D'][answerId - 1]
         : null
       
-      // Вычисляем время ответа (примерно, так как точное время нужно отслеживать отдельно)
-      const answerTime = question ? (question.time_limit || 10) : null
+      // Вычисляем время ответа: разница между текущим временем и временем загрузки вопроса
+      let answerTime: number | null = null
+      if (questionLoadTimeRef.current) {
+        const timeElapsed = (Date.now() - questionLoadTimeRef.current) / 1000 // в секундах
+        answerTime = Math.min(timeElapsed, question?.time_limit || 10) // не больше лимита
+      }
       
       const response = await fetch('/api/answer', {
         method: 'POST',

@@ -1157,9 +1157,10 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
             ).all()
             
             if len(active_players) > 1:  # Выбываем только если осталось больше 1 игрока
-                # Считаем правильные ответы для каждого игрока в этом раунде
+                # Считаем правильные ответы и общее время для каждого игрока в этом раунде
                 player_scores = []
                 for gp in active_players:
+                    # Количество правильных ответов
                     correct_count = session.query(func.count(AnswerModel.id)).filter(
                         and_(
                             AnswerModel.round_id == current_round.id,
@@ -1167,31 +1168,41 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                             AnswerModel.is_correct == True
                         )
                     ).scalar() or 0
-                    player_scores.append((gp, correct_count))
+                    
+                    # Общее время ответов в этом раунде (сумма всех answer_time)
+                    total_time = session.query(func.sum(AnswerModel.answer_time)).filter(
+                        and_(
+                            AnswerModel.round_id == current_round.id,
+                            AnswerModel.user_id == gp.user_id,
+                            AnswerModel.answer_time.isnot(None)
+                        )
+                    ).scalar() or 0.0
+                    
+                    player_scores.append((gp, correct_count, float(total_time)))
                 
-                # Сортируем по количеству правильных ответов (по возрастанию)
-                player_scores.sort(key=lambda x: x[1])
+                # Сортируем: сначала по количеству правильных ответов (по возрастанию),
+                # затем по времени ответов (по убыванию - больше времени = выбывает)
+                player_scores.sort(key=lambda x: (x[1], -x[2]))
                 
                 # Выбывает игрок с наименьшим количеством правильных ответов
-                # Если несколько игроков с одинаковым минимальным счетом, выбывает последний в списке
-                eliminated_player, eliminated_score = player_scores[0]
+                # Если несколько игроков с одинаковым минимальным счетом, выбывает тот, кто потратил больше времени
+                eliminated_player, eliminated_score, eliminated_time = player_scores[0]
                 
                 # Проверяем, есть ли другие игроки с таким же минимальным счетом
                 min_score = eliminated_score
-                players_with_min_score = [p for p, s in player_scores if s == min_score]
+                players_with_min_score = [(p, s, t) for p, s, t in player_scores if s == min_score]
                 
-                # Выбывает последний в списке среди игроков с минимальным счетом
+                # Если несколько игроков с минимальным счетом, выбывает тот, кто потратил больше времени
                 if len(players_with_min_score) > 1:
-                    # Находим последнего игрока с минимальным счетом
-                    for i in range(len(player_scores) - 1, -1, -1):
-                        if player_scores[i][1] == min_score:
-                            eliminated_player = player_scores[i][0]
-                            break
+                    # Сортируем по времени (по убыванию) - больше времени = выбывает
+                    players_with_min_score.sort(key=lambda x: -x[2])
+                    eliminated_player = players_with_min_score[0][0]
+                    eliminated_time = players_with_min_score[0][2]
                 
                 # Помечаем игрока как выбывшего
                 eliminated_player.is_eliminated = True
                 eliminated_player.eliminated_round = current_round.round_number
-                print(f"Player {eliminated_player.user_id} eliminated in round {current_round.round_number}")
+                print(f"Player {eliminated_player.user_id} eliminated in round {current_round.round_number} (score: {eliminated_score}, time: {eliminated_time:.2f}s)")
             
             # Проверяем, нужно ли завершить игру
             game = session.query(Game).filter(Game.id == game_id).first()
