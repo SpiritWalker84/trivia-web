@@ -307,24 +307,16 @@ async def get_random_question(
                     RoundQuestion.round_id == current_round.id
                 ).scalar()
                 
-                # Сначала пытаемся получить последний показанный вопрос (который бот уже показал)
-                # Это нужно для синхронизации с ботом
+                # Берем первый непоказанный вопрос (который бот покажет следующим)
+                # Это обеспечивает синхронизацию с ботом - веб-интерфейс показывает тот же вопрос, что и бот
                 round_question = session.query(RoundQuestion).filter(
                     and_(
                         RoundQuestion.round_id == current_round.id,
-                        RoundQuestion.displayed_at.isnot(None)
+                        RoundQuestion.displayed_at.is_(None)
                     )
-                ).order_by(RoundQuestion.displayed_at.desc()).first()
+                ).order_by(RoundQuestion.question_number).first()
                 
-                # Если нет показанных вопросов, берем первый непоказанный
-                if not round_question:
-                    round_question = session.query(RoundQuestion).filter(
-                        and_(
-                            RoundQuestion.round_id == current_round.id,
-                            RoundQuestion.displayed_at.is_(None)
-                        )
-                    ).order_by(RoundQuestion.question_number).first()
-                
+                # Если все вопросы показаны, раунд завершен
                 if not round_question:
                     raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
                 
@@ -333,7 +325,8 @@ async def get_random_question(
                 if not db_question:
                     raise HTTPException(status_code=404, detail="Question not found")
                 
-                # Формируем варианты ответов
+                # Формируем варианты ответов в оригинальном порядке (A, B, C, D)
+                # БЕЗ перемешивания - показываем варианты как они есть в базе
                 options = [
                     {"id": 1, "text": db_question.option_a, "is_correct": db_question.correct_option == 'A'},
                     {"id": 2, "text": db_question.option_b, "is_correct": db_question.correct_option == 'B'},
@@ -342,27 +335,6 @@ async def get_random_question(
                     options.append({"id": 3, "text": db_question.option_c, "is_correct": db_question.correct_option == 'C'})
                 if db_question.option_d:
                     options.append({"id": 4, "text": db_question.option_d, "is_correct": db_question.correct_option == 'D'})
-                
-                # Если вопрос был перемешан ботом, показываем варианты в том же порядке
-                # shuffled_options: {original_pos: display_pos} напр. {"A": "C", "B": "A", "C": "B", "D": "D"}
-                # correct_option_shuffled: буква позиции (A/B/C/D) где правильный ответ в отображении бота
-                if round_question.shuffled_options:
-                    shuffled = round_question.shuffled_options
-                    # Обратное отображение: для каждой позиции отображения (A,B,C,D) — какой оригинальный вариант
-                    inv = {new_pos: orig for orig, new_pos in shuffled.items()}
-                    shuffled_options = []
-                    for display_pos in ['A', 'B', 'C', 'D']:
-                        orig_opt = inv.get(display_pos)
-                        if orig_opt:
-                            opt_idx = ord(orig_opt) - ord('A')
-                            if opt_idx < len(options):
-                                shuffled_options.append({
-                                    "id": ord(display_pos) - ord('A') + 1,
-                                    "text": options[opt_idx]["text"],
-                                    "is_correct": display_pos == round_question.correct_option_shuffled
-                                })
-                    if shuffled_options:
-                        options = shuffled_options
                 
                 # НЕ отмечаем вопрос как показанный - это делает только бот!
                 # Веб-интерфейс только читает состояние из БД
@@ -444,6 +416,15 @@ async def submit_answer(answer: AnswerRequest):
                 if not round_question:
                     raise HTTPException(status_code=404, detail="Round question not found")
                 
+                # Получаем сам вопрос для проверки правильности ответа
+                db_question = session.query(DBQuestion).filter(DBQuestion.id == round_question.question_id).first()
+                if not db_question:
+                    raise HTTPException(status_code=404, detail="Question not found")
+                
+                # Проверяем правильность ответа на сервере по оригинальному correct_option
+                # selected_option - это буква (A, B, C, D), которую выбрал пользователь
+                is_correct = answer.selected_option == db_question.correct_option if answer.selected_option else False
+                
                 # Получаем GamePlayer
                 game_player = session.query(GamePlayer).filter(
                     and_(
@@ -466,7 +447,7 @@ async def submit_answer(answer: AnswerRequest):
                 if existing_answer:
                     # Обновляем существующий ответ
                     existing_answer.selected_option = answer.selected_option
-                    existing_answer.is_correct = answer.is_correct
+                    existing_answer.is_correct = is_correct  # Используем проверенное значение
                     existing_answer.answer_time = answer.answer_time
                     from datetime import datetime
                     import pytz
@@ -482,15 +463,15 @@ async def submit_answer(answer: AnswerRequest):
                         user_id=answer.user_id,
                         game_player_id=game_player.id,
                         selected_option=answer.selected_option,
-                        is_correct=answer.is_correct,
+                        is_correct=is_correct,  # Используем проверенное значение
                         answer_time=answer.answer_time,
                         answered_at=datetime.now(pytz.UTC)
                     )
                     session.add(new_answer)
                 
                 session.commit()
-                print(f"Answer saved: user_id={answer.user_id}, question_id={answer.question_id}, correct={answer.is_correct}")
-                return {"success": True, "correct": answer.is_correct}
+                print(f"Answer saved: user_id={answer.user_id}, question_id={answer.question_id}, selected_option={answer.selected_option}, correct_option={db_question.correct_option}, is_correct={is_correct}")
+                return {"success": True, "correct": is_correct}
                 
         except HTTPException:
             raise

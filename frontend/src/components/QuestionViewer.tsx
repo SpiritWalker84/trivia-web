@@ -220,9 +220,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     
     try {
       // Определяем выбранный вариант ответа (A, B, C, D)
-      const selectedAnswer = question?.answers.find(a => a.id === answerId)
-      const optionLetter = selectedAnswer 
-        ? ['A', 'B', 'C', 'D'][question.answers.findIndex(a => a.id === answerId)]
+      // Варианты всегда идут в порядке A, B, C, D (id: 1, 2, 3, 4)
+      const optionLetter = answerId >= 1 && answerId <= 4 
+        ? ['A', 'B', 'C', 'D'][answerId - 1]
         : null
       
       // Вычисляем время ответа (примерно, так как точное время нужно отслеживать отдельно)
