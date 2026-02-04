@@ -141,13 +141,13 @@ function App() {
       setRoundNumber(roundNumber)
       setShowRoundSummary(false)
       setRoundCompleted(false)
-      setQuestionId(null)
       
       // Увеличиваем задержку перед загрузкой лидерборда и вопроса
       // чтобы убедиться, что раунд полностью создан и запущен в БД
       setTimeout(() => {
         fetchLeaderboard(true)
-        // Сбрасываем questionId, чтобы QuestionViewer загрузил новый вопрос
+        // Сбрасываем questionId только один раз, чтобы QuestionViewer загрузил первый вопрос раунда
+        // Не делаем это дважды, чтобы не пропустить первый вопрос
         setQuestionId(null)
       }, 1500) // Увеличено с 500 до 1500 мс
       

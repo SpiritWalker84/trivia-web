@@ -58,13 +58,18 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         console.log('🚀 useEffect: Loading first question (questionId is null, first load)')
         hasInitialQuestionLoaded.current = true
         fetchRandomQuestion()
-      } else if (previousQuestionIdRef.current !== null) {
-        // Следующий вопрос - загружаем после того, как был загружен предыдущий
-        console.log('🚀 useEffect: Loading next question (questionId is null, previous question was loaded)')
+      } else if (previousQuestionIdRef.current !== null && question === null) {
+        // Следующий вопрос - загружаем только если предыдущий вопрос был загружен И текущий вопрос null
+        // Это предотвращает пропуск первого вопроса при создании раунда
+        console.log('🚀 useEffect: Loading next question (questionId is null, previous question was loaded, current question is null)')
         previousQuestionIdRef.current = null // Сбрасываем перед загрузкой следующего
         fetchRandomQuestion()
       } else {
-        console.log('⏭️ useEffect: Skipping (questionId is null but no previous question and not first load)')
+        console.log('⏭️ useEffect: Skipping (questionId is null but conditions not met)', {
+          hasInitialQuestionLoaded: hasInitialQuestionLoaded.current,
+          previousQuestionId: previousQuestionIdRef.current,
+          currentQuestion: question?.id
+        })
       }
     } else {
       console.log('⏭️ useEffect: Skipping (question already loaded)')
