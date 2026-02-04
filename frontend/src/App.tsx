@@ -311,15 +311,19 @@ function App() {
     // Завершаем текущий раунд (если есть)
     if (roundNumber > 0) {
       try {
-        // Получаем текущий раунд из API
-        const response = await fetch(`/api/leaderboard?game_id=${gameId}&user_id=${userId}`)
-        if (response.ok) {
-          const data = await response.json()
-          // Ищем текущий раунд через API или получаем его из игры
-          // Пока просто создаем следующий раунд, завершение сделаем через API
+        // Завершаем текущий раунд через API
+        const finishResponse = await fetch(`/api/round/finish-current?game_id=${gameId}`, {
+          method: 'POST',
+        })
+        if (finishResponse.ok) {
+          const finishData = await finishResponse.json()
+          console.log(`✅ Round ${roundNumber} finished:`, finishData)
+        } else {
+          console.warn('Failed to finish current round, continuing anyway')
         }
       } catch (error) {
         console.error('Error finishing current round:', error)
+        // Продолжаем создание следующего раунда даже если не удалось завершить текущий
       }
     }
     
