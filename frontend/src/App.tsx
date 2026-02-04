@@ -60,13 +60,14 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          game_type: settings.gameType,
-          theme_id: settings.themeId,
-          total_rounds: settings.totalRounds,
-          player_name: settings.playerName,
-          player_telegram_id: telegramId, // Используем telegram_id, если пользователь пришел из бота
-        }),
+               body: JSON.stringify({
+                 game_type: settings.gameType,
+                 theme_id: settings.themeId,
+                 total_rounds: settings.totalRounds,
+                 player_name: settings.playerName,
+                 player_telegram_id: telegramId, // Используем telegram_id, если пользователь пришел из бота
+                 bot_difficulty: settings.botDifficulty, // Уровень сложности ботов для training
+               }),
       })
       
       if (!response.ok) {

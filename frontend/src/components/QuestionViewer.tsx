@@ -34,6 +34,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
     
     console.log(`🔄 useEffect triggered: questionId=${questionId}, hasInitialQuestionLoaded=${hasInitialQuestionLoaded.current}, currentQuestion=${question?.id}, showRoundSummary=${showRoundSummary}`)
+    
+    // Не загружаем вопросы, если нет gameId или userId
+    if (!gameId || !userId) {
+      console.log('⏭️ useEffect: Skipping (gameId or userId missing)')
+      return
+    }
+    
     // Если questionId изменился, но это тот же вопрос, который уже загружен, не перезагружаем
     if (questionId && question?.id !== questionId) {
       console.log(`📥 useEffect: Fetching question by ID: ${questionId} (current question: ${question?.id})`)
@@ -325,7 +332,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       )}
 
       <AnimatePresence mode="wait">
-        {question && (
+        {question && question.id && (
           <motion.div
             key={question.id}
             initial={{ opacity: 0, y: 20, scale: 0.98 }}

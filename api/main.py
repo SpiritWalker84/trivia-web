@@ -652,6 +652,7 @@ class CreateGameRequest(BaseModel):
     total_rounds: int = 9
     player_name: str  # Имя игрока (для создания/получения User)
     player_telegram_id: Optional[int] = None  # Если есть telegram_id
+    bot_difficulty: Optional[str] = None  # 'novice', 'amateur', 'expert' - для training игр
 
 class CreateGameResponse(BaseModel):
     game_id: int
@@ -722,7 +723,8 @@ async def create_game(request: CreateGameRequest):
                 theme_id=request.theme_id,
                 status='waiting',
                 total_rounds=request.total_rounds,
-                current_round=0
+                current_round=0,
+                bot_difficulty=request.bot_difficulty if request.game_type == 'training' else None
             )
             session.add(game)
             session.flush()  # Получаем game.id
@@ -736,6 +738,54 @@ async def create_game(request: CreateGameRequest):
                 total_score=0
             )
             session.add(game_player)
+            
+            # Если это тренировка с ботами, добавляем ботов
+            if request.game_type == 'training':
+                bot_difficulty = request.bot_difficulty or 'amateur'  # По умолчанию amateur
+                bot_names = [
+                    'Bot_Alpha', 'Bot_Beta', 'Bot_Gamma', 'Bot_Delta', 
+                    'Bot_Epsilon', 'Bot_Zeta', 'Bot_Eta', 'Bot_Theta', 'Bot_Iota'
+                ]
+                
+                # Получаем или создаем ботов
+                bots = []
+                for idx, bot_name in enumerate(bot_names, start=2):  # start=2, т.к. игрок уже join_order=1
+                    # Ищем существующего бота с таким именем и уровнем сложности
+                    bot_user = session.query(User).filter(
+                        User.is_bot == True,
+                        User.username == bot_name,
+                        User.bot_difficulty == bot_difficulty
+                    ).first()
+                    
+                    if not bot_user:
+                        # Создаем нового бота
+                        bot_user = User(
+                            telegram_id=None,  # У ботов нет telegram_id
+                            username=bot_name,
+                            full_name=bot_name,
+                            is_bot=True,
+                            bot_difficulty=bot_difficulty
+                        )
+                        session.add(bot_user)
+                        session.flush()  # Получаем bot_user.id
+                        print(f"Created new bot: id={bot_user.id}, name={bot_name}, difficulty={bot_difficulty}")
+                    else:
+                        print(f"Using existing bot: id={bot_user.id}, name={bot_name}, difficulty={bot_difficulty}")
+                    
+                    # Добавляем бота в игру
+                    bot_game_player = GamePlayer(
+                        game_id=game.id,
+                        user_id=bot_user.id,
+                        is_bot=True,
+                        bot_difficulty=bot_difficulty,
+                        join_order=idx,
+                        total_score=0
+                    )
+                    session.add(bot_game_player)
+                    bots.append(bot_user)
+                
+                print(f"Added {len(bots)} bots to game {game.id} with difficulty {bot_difficulty}")
+            
             session.commit()
             
             print(f"Game created: id={game.id}, user_id={user.id}")
