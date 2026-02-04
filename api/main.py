@@ -1207,20 +1207,21 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 # затем по времени ответов (по убыванию - больше времени = выбывает)
                 player_scores.sort(key=lambda x: (x[1], -x[2]))
                 
-                # Выбывает игрок с наименьшим количеством правильных ответов
+                # Выбывает ТОЛЬКО ОДИН игрок с наименьшим количеством правильных ответов
                 # Если несколько игроков с одинаковым минимальным счетом, выбывает тот, кто потратил больше времени
-                eliminated_player, eliminated_score, eliminated_time = player_scores[0]
-                
-                # Проверяем, есть ли другие игроки с таким же минимальным счетом
-                min_score = eliminated_score
+                min_score = min(s for _, s, _ in player_scores)
                 players_with_min_score = [(p, s, t) for p, s, t in player_scores if s == min_score]
                 
                 # Если несколько игроков с минимальным счетом, выбывает тот, кто потратил больше времени
                 if len(players_with_min_score) > 1:
                     # Сортируем по времени (по убыванию) - больше времени = выбывает
                     players_with_min_score.sort(key=lambda x: -x[2])
-                    eliminated_player = players_with_min_score[0][0]
-                    eliminated_time = players_with_min_score[0][2]
+                    eliminated_player, eliminated_score, eliminated_time = players_with_min_score[0]
+                else:
+                    # Только один игрок с минимальным счетом
+                    eliminated_player, eliminated_score, eliminated_time = players_with_min_score[0]
+                
+                print(f"Elimination logic: min_score={min_score}, players_with_min_score={len(players_with_min_score)}, eliminated_player={eliminated_player.user_id}, time={eliminated_time:.2f}s")
                 
                 # Помечаем игрока как выбывшего
                 eliminated_player.is_eliminated = True
