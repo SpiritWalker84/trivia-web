@@ -14,6 +14,9 @@ interface RoundSummaryProps {
 const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onLeaveGame }: RoundSummaryProps) => {
   const [timeLeft, setTimeLeft] = useState(60)
   const [progress, setProgress] = useState(100)
+  
+  // Фильтруем участников, у которых есть id
+  const validParticipants = participants.filter(p => p && p.id)
 
   // Автоматический таймер на 60 секунд
   useEffect(() => {
@@ -58,7 +61,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
   const offset = circumference - (progress / 100) * circumference
 
   const isLastRound = roundNumber >= totalRounds
-  const sortedParticipants = [...participants].sort((a, b) => b.correct_answers - a.correct_answers)
+  const sortedParticipants = [...validParticipants].sort((a, b) => b.correct_answers - a.correct_answers)
   
   // Определяем выбывшего игрока - только один, кто занял последнее место (последний в отсортированном списке)
   // Если несколько игроков с одинаковым минимальным счетом, выбывает последний в списке

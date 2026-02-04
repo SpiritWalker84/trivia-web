@@ -121,10 +121,16 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         throw new Error('Не удалось загрузить вопрос')
       }
       const data = await response.json()
+      
+      // Проверяем, что данные корректны
+      if (!data || !data.question) {
+        throw new Error('Invalid response from server: question is missing')
+      }
+      
       console.log('✅ fetchRandomQuestion: Question loaded from API:', {
         questionId: data.question.id,
         roundQuestionId: data.round_question_id,
-        questionText: data.question.text.substring(0, 50) + '...'
+        questionText: data.question.text?.substring(0, 50) + '...'
       })
       
       setQuestion(data.question)
@@ -155,8 +161,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       onQuestionLoaded?.()
       
       // Вызываем onQuestionChange ПОСЛЕ обновления счетчика, чтобы избежать повторной загрузки
-      console.log('📝 fetchRandomQuestion: Calling onQuestionChange with ID:', data.question.id)
-      onQuestionChange(data.question.id)
+      if (data.question && data.question.id) {
+        console.log('📝 fetchRandomQuestion: Calling onQuestionChange with ID:', data.question.id)
+        onQuestionChange(data.question.id)
+      } else {
+        console.error('❌ fetchRandomQuestion: Question ID is missing!', data)
+        throw new Error('Question ID is missing in response')
+      }
       
       // Сбрасываем флаг после успешной загрузки, чтобы можно было загрузить следующий вопрос
       console.log('🔄 fetchRandomQuestion: Resetting isNextQuestionScheduled to false')
