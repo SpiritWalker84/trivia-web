@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import QuestionViewer from './components/QuestionViewer'
 import Leaderboard from './components/Leaderboard'
@@ -42,6 +42,7 @@ function App() {
   const [questionId, setQuestionId] = useState<number | null>(null)
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null) // Текущий вопрос для таймера
   const [participants, setParticipants] = useState<Participant[]>([])
+  const questionViewerTimeUpRef = useRef<(() => void) | null>(null) // Ref для вызова handleTimeUp из QuestionViewer
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [totalQuestions, setTotalQuestions] = useState(10)
   const [showRoundSummary, setShowRoundSummary] = useState(false)
@@ -303,15 +304,13 @@ function App() {
   }
 
   const handleTimerTimeUp = () => {
-    // Когда таймер заканчивается, показываем правильный ответ, затем через 2-3 секунды загружаем следующий вопрос
-    console.log('⏰ App: Timer time up, will load next question after delay')
-    // Сбрасываем текущий вопрос, чтобы таймер исчез
+    // Когда таймер заканчивается, вызываем handleTimeUp из QuestionViewer для показа правильного ответа
+    console.log('⏰ App: Timer time up, calling QuestionViewer handleTimeUp')
+    if (questionViewerTimeUpRef.current) {
+      questionViewerTimeUpRef.current()
+    }
+    // Сбрасываем currentQuestion, чтобы таймер исчез
     setCurrentQuestion(null)
-    // Добавляем задержку в 2.5 секунды перед загрузкой следующего вопроса, чтобы пользователь успел увидеть правильный ответ
-    setTimeout(() => {
-      console.log('⏰ App: Delay passed, resetting questionId to load next question')
-      setQuestionId(null) // Сбрасываем questionId, чтобы загрузить следующий вопрос
-    }, 2500) // 2.5 секунды задержки
   }
 
   const handleNextRound = async () => {
