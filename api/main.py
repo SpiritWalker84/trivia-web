@@ -665,6 +665,9 @@ async def get_leaderboard(
                     ).scalar() or 0
                     
                     is_eliminated = gp.is_eliminated or False
+                    # Логируем для отладки
+                    if is_eliminated:
+                        print(f"Leaderboard API: Player {gp.user.id} ({gp.user.full_name or gp.user.username}) is eliminated (GamePlayer.id={gp.id}, is_eliminated={gp.is_eliminated})")
                     participants_data.append({
                         "id": gp.user.id,
                         "name": gp.user.full_name or gp.user.username or f"User {gp.user.id}",
@@ -673,8 +676,6 @@ async def get_leaderboard(
                         "is_current_user": gp.user_id == user_id if user_id else False,
                         "is_eliminated": is_eliminated
                     })
-                    if is_eliminated:
-                        print(f"Leaderboard: Player {gp.user.id} ({gp.user.full_name or gp.user.username}) is eliminated")
                 
                 # Сортируем по убыванию правильных ответов
                 participants_data.sort(key=lambda x: x["correct_answers"], reverse=True)
@@ -1206,6 +1207,13 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 eliminated_player.is_eliminated = True
                 eliminated_player.eliminated_round = current_round.round_number
                 print(f"Player {eliminated_player.user_id} eliminated in round {current_round.round_number} (score: {eliminated_score}, time: {eliminated_time:.2f}s)")
+                print(f"DEBUG: Set is_eliminated=True for GamePlayer {eliminated_player.id}, user_id={eliminated_player.user_id}")
+                # Принудительно обновляем объект в сессии
+                session.add(eliminated_player)
+                session.flush()
+                # Проверяем, что значение установлено
+                session.refresh(eliminated_player)
+                print(f"DEBUG: After flush, GamePlayer {eliminated_player.id} is_eliminated={eliminated_player.is_eliminated}")
             
             # Проверяем, нужно ли завершить игру
             game = session.query(Game).filter(Game.id == game_id).first()
