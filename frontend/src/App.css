@@ -1,3 +1,17 @@
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.loading-screen h2 {
+  font-size: 2rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .app {
   width: 100%;
   min-height: 100vh;
