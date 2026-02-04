@@ -141,6 +141,7 @@ class Participant(BaseModel):
     correct_answers: int
     avatar: Optional[str] = None
     is_current_user: Optional[bool] = False
+    is_eliminated: Optional[bool] = False
 
 class LeaderboardResponse(BaseModel):
     participants: List[Participant]
