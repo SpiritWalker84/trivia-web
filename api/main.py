@@ -1234,10 +1234,12 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 # Если не осталось живых человеческих игроков, останавливаем игру
                 if len(remaining_active_players) == 0:
                     game = session.query(Game).filter(Game.id == game_id).first()
-                    if game:
+                    if game and game.status != 'finished':
                         game.status = 'finished'
                         game.finished_at = datetime.now(pytz.UTC)
                         print(f"Game {game_id} stopped: all human players eliminated, only bots remain")
+                        session.add(game)
+                        session.flush()
             
             # Проверяем, нужно ли завершить игру (по количеству раундов)
             game = session.query(Game).filter(Game.id == game_id).first()

@@ -347,6 +347,17 @@ function App() {
           console.log(`✅ Round ${roundNumber} finished:`, finishData)
           // Обновляем лидерборд сразу после завершения раунда, чтобы получить актуальные данные о выбывших
           await fetchLeaderboard(true)
+          
+          // Проверяем статус игры - если игра остановлена (все человеческие игроки выбыли), не создаем новый раунд
+          const gameStatusResponse = await fetch(`/api/game/status?game_id=${gameId}`)
+          if (gameStatusResponse.ok) {
+            const gameStatus = await gameStatusResponse.json()
+            if (gameStatus.status === 'finished') {
+              console.log('⚠️ Game is finished (all human players eliminated), stopping')
+              alert('Игра завершена: все человеческие игроки выбыли')
+              return
+            }
+          }
         } else {
           console.warn('Failed to finish current round, continuing anyway')
         }
@@ -354,6 +365,12 @@ function App() {
         console.error('Error finishing current round:', error)
         // Продолжаем создание следующего раунда даже если не удалось завершить текущий
       }
+    }
+    
+    // Проверяем, не превысили ли мы максимальное количество раундов
+    if (nextRoundNumber > totalRounds) {
+      console.log('⚠️ Maximum rounds reached, game finished')
+      return
     }
     
     // Сбрасываем состояние для нового раунда
