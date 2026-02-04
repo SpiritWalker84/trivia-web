@@ -33,15 +33,11 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   useEffect(() => {
     // Не загружаем вопросы, если показывается summary раунда
     if (showRoundSummary) {
-      console.log('⏭️ useEffect: Skipping (round summary is showing, showRoundSummary=true)')
       return
     }
     
-    console.log(`🔄 useEffect triggered: questionId=${questionId}, hasInitialQuestionLoaded=${hasInitialQuestionLoaded.current}, currentQuestion=${question?.id}, showRoundSummary=${showRoundSummary}`)
-    
     // Не загружаем вопросы, если нет gameId или userId
     if (!gameId || !userId) {
-      console.log('⏭️ useEffect: Skipping (gameId or userId missing)')
       return
     }
     
@@ -49,10 +45,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     if (questionId && question?.id !== questionId) {
       // В игровом потоке используем /api/questions/random, чтобы не ловить 404 из mock /api/questions/{id}
       if (!gameId || !userId) {
-        console.log(`📥 useEffect: Fetching question by ID: ${questionId} (current question: ${question?.id})`)
         fetchQuestion(questionId)
       } else {
-        console.log(`⏭️ useEffect: Skipping fetchQuestion (game flow uses /api/questions/random)`)
       }
       previousQuestionIdRef.current = questionId
     } else if (!questionId) {
@@ -62,24 +56,16 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       // Для следующих вопросов: previousQuestionIdRef.current !== null (был загружен вопрос ранее)
       if (!hasInitialQuestionLoaded.current) {
         // Первый вопрос - загружаем сразу
-        console.log('🚀 useEffect: Loading first question (questionId is null, first load)')
         hasInitialQuestionLoaded.current = true
         fetchRandomQuestion()
       } else if (previousQuestionIdRef.current !== null && question === null) {
         // Следующий вопрос - загружаем только если предыдущий вопрос был загружен И текущий вопрос null
         // Это предотвращает пропуск первого вопроса при создании раунда
-        console.log('🚀 useEffect: Loading next question (questionId is null, previous question was loaded, current question is null)')
         previousQuestionIdRef.current = null // Сбрасываем перед загрузкой следующего
         fetchRandomQuestion()
       } else {
-        console.log('⏭️ useEffect: Skipping (questionId is null but conditions not met)', {
-          hasInitialQuestionLoaded: hasInitialQuestionLoaded.current,
-          previousQuestionId: previousQuestionIdRef.current,
-          currentQuestion: question?.id
-        })
       }
     } else {
-      console.log('⏭️ useEffect: Skipping (question already loaded)')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionId, showRoundSummary])
@@ -107,11 +93,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     let keepLoading = false
     // Защита от повторных вызовов
     if (isNextQuestionScheduled.current && retryCount === 0) {
-      console.warn('⚠️ fetchRandomQuestion: Already scheduled, skipping. isNextQuestionScheduled=true')
       return
     }
-    
-    console.log(`🚀 fetchRandomQuestion: STARTING (retry ${retryCount}). isNextQuestionScheduled was false, setting to true`)
     if (retryCount === 0) {
       isNextQuestionScheduled.current = true
     }
@@ -138,13 +121,11 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       if (gameId) url.searchParams.set('game_id', gameId.toString())
       if (userId) url.searchParams.set('user_id', userId.toString())
       
-      console.log(`📡 fetchRandomQuestion: Making API call to ${url.toString()}...`)
       const response = await fetch(url.toString())
       if (!response.ok) {
         if (response.status === 202) {
           // Игра ожидает начала - пробуем повторить через некоторое время
           const errorData = await response.json().catch(() => ({ detail: 'Game is waiting to start' }))
-          console.log(`⏳ fetchRandomQuestion: Game is waiting to start (202), retry ${retryCount}`)
           
           if (retryCount < 30) {
             // Повторяем попытку через 1 секунду
@@ -165,11 +146,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           // Получаем детали ошибки
           const errorData = await response.json().catch(() => ({ detail: 'Round completed' }))
           const errorDetail = errorData.detail || 'Round completed'
-          console.log(`✅ fetchRandomQuestion: ${errorDetail} (400), retry ${retryCount}`)
           
           // Если это "No active round found" или "Game is not in progress", пробуем повторить
           if ((errorDetail.includes('No active round') || errorDetail.includes('not in progress')) && retryCount < 30) {
-            console.log(`🔄 fetchRandomQuestion: Retrying in 1 second...`)
             keepLoading = true
             setError(null)
             setTimeout(() => {
@@ -191,7 +170,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       
       // Проверяем, что данные корректны
       if (!data || !data.question) {
-        console.warn('⚠️ fetchRandomQuestion: Invalid response, retrying...', data)
         if (retryCount < 5) {
           keepLoading = true
           setError(null)
@@ -203,18 +181,11 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         throw new Error('Invalid response from server: question is missing')
       }
       
-      console.log('✅ fetchRandomQuestion: Question loaded from API:', {
-        questionId: data.question.id,
-        roundQuestionId: data.round_question_id,
-        questionText: data.question.text?.substring(0, 50) + '...'
-      })
-      
       const newQuestionId = data.question.id
       const newRoundQuestionId = data.round_question_id || null
       const isSameQuestion = newQuestionId === question?.id && newRoundQuestionId === roundQuestionId
 
         if (isSameQuestion) {
-        console.log('⏸️ fetchRandomQuestion: Same question returned, keeping current view')
           if (preserveState && retryCount < 30) {
             setTimeout(() => {
               fetchRandomQuestion(retryCount + 1, { silent: true })
@@ -251,21 +222,17 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
               round_question_id: data.round_question_id,
             }),
           })
-          console.log('✅ Question marked as displayed:', data.round_question_id)
         } catch (error) {
-          console.warn('⚠️ Failed to mark question as displayed:', error)
           // Не критично, продолжаем работу
         }
       }
       
       // Уведомляем о загрузке вопроса - это обновит счетчик в App
       // Вызываем СРАЗУ после установки вопроса
-      console.log('📊 fetchRandomQuestion: Calling onQuestionLoaded to update counter')
       onQuestionLoaded?.(data.question)
       
       // Вызываем onQuestionChange ПОСЛЕ обновления счетчика, чтобы избежать повторной загрузки
       if (data.question && data.question.id) {
-        console.log('📝 fetchRandomQuestion: Calling onQuestionChange with ID:', data.question.id)
         onQuestionChange(data.question.id)
       } else {
         console.error('❌ fetchRandomQuestion: Question ID is missing!', data)
@@ -273,7 +240,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       }
       
       // Сбрасываем флаг после успешной загрузки, чтобы можно было загрузить следующий вопрос
-      console.log('🔄 fetchRandomQuestion: Resetting isNextQuestionScheduled to false')
       isNextQuestionScheduled.current = false
     } catch (err) {
       console.error('❌ fetchRandomQuestion: Error:', err)
@@ -299,7 +265,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const handleTimeUp = useCallback(() => {
     // Не обрабатываем, если показывается summary раунда
     if (showRoundSummary) {
-      console.log('handleTimeUp: Skipping (round summary is showing)')
       return
     }
     
@@ -307,7 +272,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
     // Проверяем, не запланирован ли уже следующий вопрос
     if (isNextQuestionScheduled.current) {
-      console.log('handleTimeUp: Next question already scheduled, skipping')
       return
     }
     
@@ -329,12 +293,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       clearTimeout(nextQuestionTimeoutRef.current)
     }
 
-    console.log('handleTimeUp: Scheduling next question in 2.5 seconds')
     nextQuestionTimeoutRef.current = setTimeout(() => {
-      console.log('handleTimeUp: Timeout fired, fetching next question')
       // Проверяем еще раз перед загрузкой
       if (showRoundSummary) {
-        console.log('handleTimeUp: Skipping fetch (round summary is showing)')
         isNextQuestionScheduled.current = false
         return
       }
@@ -384,7 +345,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
   const sendAnswer = async (questionId: number, answerId: number, isCorrect: boolean) => {
     if (!gameId || !userId) {
-      console.warn('⚠️ sendAnswer: game_id or user_id missing, skipping answer submission')
       return
     }
     
@@ -423,7 +383,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      console.log('✅ Answer submitted successfully')
     } catch (error) {
       console.error('Failed to send answer:', error)
     }

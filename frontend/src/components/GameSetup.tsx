@@ -63,7 +63,6 @@ const GameSetup = ({
           setIsLoadingName(false)
         })
         .catch(err => {
-          console.warn('Failed to load user info:', err)
           setPlayerName(`Игрок ${telegramId}`)
           setIsLoadingName(false)
         })
