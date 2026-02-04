@@ -470,6 +470,10 @@ function App() {
               fetchLeaderboard(true)
             }} // Обновляем счетчик только после загрузки вопроса
             showRoundSummary={showRoundSummary} // Передаем флаг, чтобы не загружать вопросы во время summary
+            onTimerTimeUp={(handleTimeUpFn) => {
+              // Сохраняем ссылку на handleTimeUp из QuestionViewer для вызова при истечении таймера
+              questionViewerTimeUpRef.current = handleTimeUpFn
+            }}
           />
         </main>
       </div>

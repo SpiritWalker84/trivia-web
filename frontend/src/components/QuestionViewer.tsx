@@ -12,9 +12,10 @@ interface QuestionViewerProps {
   onRoundComplete?: () => void
   onQuestionLoaded?: (question: Question) => void // Callback когда вопрос успешно загружен
   showRoundSummary?: boolean // Флаг, что показывается summary раунда
+  onTimerTimeUp?: (handleTimeUpFn: () => void) => void // Callback для передачи функции handleTimeUp в родительский компонент
 }
 
-const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundComplete, onQuestionLoaded, showRoundSummary }: QuestionViewerProps) => {
+const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundComplete, onQuestionLoaded, showRoundSummary, onTimerTimeUp }: QuestionViewerProps) => {
   const [question, setQuestion] = useState<Question | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
