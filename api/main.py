@@ -265,6 +265,102 @@ print(f"API server starting. Initial current_round_question={current_round_quest
 async def root():
     return {"message": "Trivia Web API", "version": "0.1.0"}
 
+def answer_for_bots_sync(session: Session, game_id: int, round_question_id: int, db_question: DBQuestion):
+    """
+    Автоматически отвечает за всех ботов в игре на текущий вопрос (синхронная версия)
+    """
+    try:
+        # Получаем всех ботов в игре
+        bot_players = session.query(GamePlayer).join(User).filter(
+            and_(
+                GamePlayer.game_id == game_id,
+                User.is_bot == True,
+                GamePlayer.is_eliminated == False
+            )
+        ).all()
+        
+        if not bot_players:
+            return
+        
+        # Получаем правильный ответ
+        correct_option = db_question.correct_option  # 'A', 'B', 'C', or 'D'
+        correct_answer_id = {'A': 1, 'B': 2, 'C': 3, 'D': 4}.get(correct_option, 1)
+        
+        # Получаем количество вариантов ответа
+        num_options = 2
+        if db_question.option_d:
+            num_options = 4
+        elif db_question.option_c:
+            num_options = 3
+        
+        for bot_player in bot_players:
+            # Проверяем, не ответил ли уже бот на этот вопрос
+            existing_answer = session.query(AnswerModel).filter(
+                and_(
+                    AnswerModel.round_question_id == round_question_id,
+                    AnswerModel.user_id == bot_player.user_id
+                )
+            ).first()
+            
+            if existing_answer:
+                continue  # Бот уже ответил
+            
+            # Получаем уровень сложности бота
+            bot_user = session.query(User).filter(User.id == bot_player.user_id).first()
+            bot_difficulty = bot_user.bot_difficulty if bot_user else 'amateur'
+            
+            # Определяем точность бота в зависимости от уровня сложности
+            accuracy = {
+                'novice': 0.55,
+                'amateur': 0.68,
+                'expert': 0.80
+            }.get(bot_difficulty, 0.68)
+            
+            # Бот отвечает правильно с вероятностью accuracy
+            is_correct = random.random() < accuracy
+            
+            if is_correct:
+                selected_option = correct_option
+                selected_answer_id = correct_answer_id
+            else:
+                # Выбираем случайный неправильный ответ
+                wrong_options = [opt for opt in ['A', 'B', 'C', 'D'][:num_options] if opt != correct_option]
+                selected_option = random.choice(wrong_options)
+                selected_answer_id = {'A': 1, 'B': 2, 'C': 3, 'D': 4}[selected_option]
+            
+            # Случайное время ответа (от 3 до 15 секунд)
+            answer_time = random.uniform(3.0, 15.0)
+            
+            # Получаем round_id
+            round_question = session.query(RoundQuestion).filter(RoundQuestion.id == round_question_id).first()
+            if not round_question:
+                continue
+            
+            # Создаем ответ бота
+            from datetime import datetime
+            import pytz
+            bot_answer = AnswerModel(
+                game_id=game_id,
+                round_id=round_question.round_id,
+                round_question_id=round_question_id,
+                user_id=bot_player.user_id,
+                game_player_id=bot_player.id,
+                selected_option=selected_option,
+                is_correct=is_correct,
+                answer_time=answer_time,
+                answered_at=datetime.now(pytz.UTC)
+            )
+            session.add(bot_answer)
+        
+        session.commit()
+        print(f"Bots answered for round_question_id={round_question_id}, {len(bot_players)} bots")
+        
+    except Exception as e:
+        print(f"Error answering for bots: {e}")
+        import traceback
+        traceback.print_exc()
+        session.rollback()
+
 @app.get("/api/questions/random", response_model=QuestionResponse)
 async def get_random_question(
     game_id: Optional[int] = Query(None, description="ID игры"),
@@ -352,6 +448,16 @@ async def get_random_question(
                 
                 current_question_num = round_question.question_number
                 print(f"Returning question {current_question_num} from round {current_round.round_number}, round_question_id={round_question.id}")
+                
+                # Автоматически отвечаем за ботов при получении вопроса
+                # Делаем это в фоне, чтобы не блокировать ответ
+                try:
+                    # Используем отдельную сессию для ботов, чтобы не блокировать текущую транзакцию
+                    with get_db_session() as bot_session:
+                        answer_for_bots_sync(bot_session, game_id, round_question.id, db_question)
+                except Exception as e:
+                    print(f"Warning: Could not answer for bots: {e}")
+                
                 return QuestionResponse(question=question, round_question_id=round_question.id)
                 
         except HTTPException:

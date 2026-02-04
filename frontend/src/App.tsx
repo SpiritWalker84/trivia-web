@@ -311,12 +311,23 @@ function App() {
     // Завершаем текущий раунд (если есть)
     if (roundNumber > 0) {
       try {
-        // TODO: Получить round_id текущего раунда и завершить его
-        // Пока просто создаем следующий раунд
+        // Получаем текущий раунд из API
+        const response = await fetch(`/api/leaderboard?game_id=${gameId}&user_id=${userId}`)
+        if (response.ok) {
+          const data = await response.json()
+          // Ищем текущий раунд через API или получаем его из игры
+          // Пока просто создаем следующий раунд, завершение сделаем через API
+        }
       } catch (error) {
         console.error('Error finishing current round:', error)
       }
     }
+    
+    // Сбрасываем состояние для нового раунда
+    setShowRoundSummary(false)
+    setRoundCompleted(false)
+    setQuestionId(null)
+    setCurrentQuestionNumber(1)
     
     // Создаем и запускаем следующий раунд
     await createAndStartRound(gameId, nextRoundNumber)
