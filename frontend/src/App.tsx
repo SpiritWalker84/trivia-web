@@ -303,9 +303,10 @@ function App() {
   }
 
   const handleTimerTimeUp = () => {
-    // Когда таймер заканчивается, сбрасываем questionId, чтобы QuestionViewer загрузил следующий вопрос
+    // Когда таймер заканчивается, сбрасываем questionId и currentQuestion, чтобы QuestionViewer загрузил следующий вопрос
     console.log('⏰ App: Timer time up, resetting questionId to load next question')
-    setQuestionId(null)
+    setCurrentQuestion(null) // Сбрасываем текущий вопрос, чтобы таймер исчез
+    setQuestionId(null) // Сбрасываем questionId, чтобы загрузить следующий вопрос
   }
 
   const handleNextRound = async () => {

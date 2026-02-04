@@ -26,6 +26,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const isNextQuestionScheduled = useRef(false)
   const hasInitialQuestionLoaded = useRef(false)
   const questionLoadTimeRef = useRef<number | null>(null) // Время загрузки вопроса
+  const previousQuestionIdRef = useRef<number | null>(null) // Предыдущий questionId для отслеживания изменений
 
   useEffect(() => {
     // Не загружаем вопросы, если показывается summary раунда
@@ -46,13 +47,20 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     if (questionId && question?.id !== questionId) {
       console.log(`📥 useEffect: Fetching question by ID: ${questionId} (current question: ${question?.id})`)
       fetchQuestion(questionId)
-    } else if (!questionId && !hasInitialQuestionLoaded.current) {
-      // Загружаем первый вопрос только один раз при монтировании
-      console.log('🚀 useEffect: Loading initial question (questionId is null)')
-      hasInitialQuestionLoaded.current = true
-      fetchRandomQuestion()
+      previousQuestionIdRef.current = questionId
+    } else if (!questionId) {
+      // Если questionId стал null, это означает, что нужно загрузить следующий вопрос
+      // Проверяем, что это действительно изменение (не первый рендер)
+      if (previousQuestionIdRef.current !== null || !hasInitialQuestionLoaded.current) {
+        console.log('🚀 useEffect: Loading next question (questionId is null, previous was not null or first load)')
+        hasInitialQuestionLoaded.current = true
+        previousQuestionIdRef.current = null
+        fetchRandomQuestion()
+      } else {
+        console.log('⏭️ useEffect: Skipping (questionId is null but no previous question)')
+      }
     } else {
-      console.log('⏭️ useEffect: Skipping (question already loaded or initial question already loaded)')
+      console.log('⏭️ useEffect: Skipping (question already loaded)')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionId, showRoundSummary])
