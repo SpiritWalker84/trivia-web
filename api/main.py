@@ -37,8 +37,11 @@ try:
         User, Theme
     )
     DB_MODELS_AVAILABLE = True
+    print(f"Database models imported successfully from shared/db_models.py (path: {shared_path if shared_path else 'found'})")
 except ImportError as e:
     print(f"Could not import database models: {e}")
+    print(f"Python path: {sys.path}")
+    print("Will use mock data")
     DB_MODELS_AVAILABLE = False
     Game = GamePlayer = Round = RoundQuestion = DBQuestion = AnswerModel = User = Theme = None
 
@@ -89,6 +92,7 @@ def init_database():
     """Инициализация подключения к БД, если указан DATABASE_URL"""
     global _db_engine, _db_session_factory
     if DATABASE_URL:
+        print(f"Connecting to database: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'configured'}")
         _db_engine = create_engine(
             DATABASE_URL,
             poolclass=QueuePool,
@@ -102,8 +106,9 @@ def init_database():
             autoflush=False,
             bind=_db_engine
         )
+        print("Database connection initialized")
     else:
-        pass
+        print("DATABASE_URL not set, using mock data")
 
 @contextmanager
 def get_db_session():
@@ -287,6 +292,7 @@ for i in range(1, 11):
 current_round_question = 0  # Текущий номер вопроса в раунде
 
 # Инициализация при старте сервера
+print(f"API server starting. Initial current_round_question={current_round_question}")
 
 @app.get("/")
 async def root():
@@ -381,6 +387,8 @@ def answer_for_bots_sync(session: Session, game_id: int, round_question_id: int,
             session.add(bot_answer)
         
         session.commit()
+        print(f"Bots answered for round_question_id={round_question_id}, {len(bot_players)} bots")
+        
     except Exception as e:
         print(f"Error answering for bots: {e}")
         import traceback
@@ -397,6 +405,9 @@ async def get_random_question(
     from datetime import datetime, timedelta
     import pytz
     global current_round_question
+    
+    print(f"=== /api/questions/random CALLED ===")
+    print(f"game_id={game_id}, user_id={user_id}")
     
     # Если БД доступна и указаны game_id и user_id, используем БД
     if DB_MODELS_AVAILABLE and _db_session_factory and game_id and user_id:
@@ -509,6 +520,8 @@ async def get_random_question(
                 )
                 
                 current_question_num = round_question.question_number
+                print(f"Returning question {current_question_num} from round {current_round.round_number}, round_question_id={round_question.id}")
+                
                 # Автоматически отвечаем за ботов при получении вопроса
                 # Делаем это в фоне, чтобы не блокировать ответ
                 try:
@@ -516,7 +529,7 @@ async def get_random_question(
                     with get_db_session() as bot_session:
                         answer_for_bots_sync(bot_session, game_id, round_question.id, db_question)
                 except Exception as e:
-                    pass
+                    print(f"Warning: Could not answer for bots: {e}")
                 
                 return QuestionResponse(question=question, round_question_id=round_question.id)
                 
@@ -530,18 +543,27 @@ async def get_random_question(
             pass
     
     # Fallback: используем мок-данные
+    print(f"BEFORE: current_round_question={current_round_question}")
+    print(f"Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
+    
     if current_round_question >= 10:
+        print(f"Round already completed. current_round_question={current_round_question}")
         raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
     
     question_data = random.choice(MOCK_QUESTIONS)
     question = Question(**question_data)
     
     current_round_question = current_round_question + 1
+    print(f"AFTER: current_round_question={current_round_question}")
+    print(f"Returning question ID: {question.id}")
+    print(f"=== /api/questions/random COMPLETE ===\n")
+    
     return QuestionResponse(question=question)
 
 @app.get("/api/questions/{question_id}", response_model=QuestionResponse)
 async def get_question(question_id: int):
     """Получить вопрос по ID (не увеличивает счетчик раунда)"""
+    print(f"Fetching question by ID: {question_id} (current_round_question={current_round_question})")
     question_data = next((q for q in MOCK_QUESTIONS if q["id"] == question_id), None)
     if not question_data:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -596,6 +618,7 @@ async def submit_answer(answer: AnswerRequest):
                 # Проверяем, не выбыл ли игрок
                 if game_player.is_eliminated:
                     # Выбывший игрок может отвечать, но очки не засчитываются
+                    print(f"Eliminated player {answer.user_id} answered, but points won't be counted")
                     return {"success": True, "correct": is_correct, "eliminated": True}
                 
                 # Проверяем, не ответил ли уже пользователь на этот вопрос
@@ -632,6 +655,7 @@ async def submit_answer(answer: AnswerRequest):
                     session.add(new_answer)
                 
                 session.commit()
+                print(f"Answer saved: user_id={answer.user_id}, question_id={answer.question_id}, selected_option={answer.selected_option}, correct_option={db_question.correct_option}, is_correct={is_correct}")
                 return {"success": True, "correct": is_correct}
                 
         except HTTPException:
@@ -646,11 +670,13 @@ async def submit_answer(answer: AnswerRequest):
     # Fallback: используем мок-данные
     if answer.is_correct:
         user_scores[1] = user_scores.get(1, 0) + 1
+        print(f"User 1 correct answer! New score: {user_scores[1]}")
     
     for user_id in range(2, 11):
         if random.random() < 0.7:
             user_scores[user_id] = user_scores.get(user_id, 0) + 1
     
+    print(f"Current scores: {dict(user_scores)}")
     return {"success": True, "correct": answer.is_correct}
 
 @app.get("/api/leaderboard", response_model=LeaderboardResponse)
@@ -699,6 +725,7 @@ async def get_leaderboard(
                 for gp in game_players:
                     # Проверяем, что у GamePlayer есть связанный User
                     if not gp.user:
+                        print(f"Warning: GamePlayer {gp.id} has no associated user, skipping")
                         continue
                     
                     # Считаем правильные ответы в текущем раунде
@@ -711,6 +738,9 @@ async def get_leaderboard(
                     ).scalar() or 0
                     
                     is_eliminated = gp.is_eliminated or False
+                    # Логируем для отладки
+                    if is_eliminated:
+                        print(f"Leaderboard API: Player {gp.user.id} ({gp.user.full_name or gp.user.username}) is eliminated (GamePlayer.id={gp.id}, is_eliminated={gp.is_eliminated})")
                     
                     # Считаем общее время ответов в текущем раунде
                     total_time = session.query(func.sum(AnswerModel.answer_time)).filter(
@@ -753,6 +783,8 @@ async def get_leaderboard(
                 
                 participants = [Participant(**p) for p in participants_data]
                 
+                print(f"/api/leaderboard: game_id={game_id}, current_question={current_question_num}, total={total_questions}")
+                
                 return LeaderboardResponse(
                     participants=participants,
                     current_question_number=current_question_num,
@@ -778,6 +810,8 @@ async def get_leaderboard(
         
         participants = [Participant(**p) for p in participants_data]
         
+        print(f"/api/leaderboard: current_round_question={current_round_question}, total_questions=10")
+        
         return LeaderboardResponse(
             participants=participants,
             current_question_number=current_round_question,
@@ -796,10 +830,15 @@ async def reset_round():
     """Сбросить текущий раунд (начать новый)"""
     global current_round_question
     import traceback
+    print(f"=== RESET ROUND CALLED ===")
+    print(f"Previous question number: {current_round_question}")
+    print(f"Call stack: {''.join(traceback.format_stack())}")
     current_round_question = 0
     # Сбрасываем счетчики правильных ответов для нового раунда
     for i in range(1, 11):
         user_scores[i] = 0
+    print("Round reset complete. Scores cleared.")
+    print(f"=== RESET ROUND COMPLETE ===")
     return {"success": True, "message": "Round reset"}
 
 class LeaveGameRequest(BaseModel):
@@ -880,6 +919,8 @@ async def create_game(request: CreateGameRequest):
     """
     Создать новую игру (для standalone frontend)
     """
+    print(f"=== CREATE GAME CALLED === game_type={request.game_type}, player_name={request.player_name}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -904,8 +945,9 @@ async def create_game(request: CreateGameRequest):
                 )
                 session.add(user)
                 session.flush()  # Получаем user.id
+                print(f"Created new user: id={user.id}, name={request.player_name}")
             else:
-                pass
+                print(f"Using existing user: id={user.id}, name={user.full_name}")
             
             # Создаем игру
             game = Game(
@@ -959,8 +1001,9 @@ async def create_game(request: CreateGameRequest):
                         )
                         session.add(bot_user)
                         session.flush()  # Получаем bot_user.id
+                        print(f"Created new bot: id={bot_user.id}, name={bot_name}, difficulty={bot_difficulty}")
                     else:
-                        pass
+                        print(f"Using existing bot: id={bot_user.id}, name={bot_name}, difficulty={bot_difficulty}")
                     
                     # Добавляем бота в игру
                     bot_game_player = GamePlayer(
@@ -974,7 +1017,11 @@ async def create_game(request: CreateGameRequest):
                     session.add(bot_game_player)
                     bots.append(bot_user)
                 
+                print(f"Added {len(bots)} bots to game {game.id} with difficulty {bot_difficulty}")
+            
             session.commit()
+            
+            print(f"Game created: id={game.id}, user_id={user.id}")
             return CreateGameResponse(
                 game_id=game.id,
                 user_id=user.id,
@@ -993,6 +1040,8 @@ async def create_private_game(request: CreatePrivateGameRequest):
     """
     Создать приватную игру и вернуть код комнаты
     """
+    print(f"=== CREATE PRIVATE GAME CALLED === player_name={request.player_name}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1015,8 +1064,9 @@ async def create_private_game(request: CreatePrivateGameRequest):
                 )
                 session.add(user)
                 session.flush()
+                print(f"Created new user: id={user.id}, name={request.player_name}")
             else:
-                pass
+                print(f"Using existing user: id={user.id}, name={user.full_name}")
             
             # Создаем приватную игру
             game = Game(
@@ -1044,6 +1094,7 @@ async def create_private_game(request: CreatePrivateGameRequest):
             invite_code = encode_room_code(int(game.id))
             invite_link = f"{FRONTEND_URL}/?room={invite_code}" if FRONTEND_URL else invite_code
             
+            print(f"Private game created: id={game.id}, invite_code={invite_code}")
             return CreatePrivateGameResponse(
                 game_id=game.id,
                 user_id=user.id,
@@ -1063,6 +1114,8 @@ async def join_private_game(request: JoinPrivateGameRequest):
     """
     Войти в приватную игру по коду комнаты
     """
+    print(f"=== JOIN PRIVATE GAME CALLED === room_code={request.room_code}, player_name={request.player_name}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1093,6 +1146,7 @@ async def join_private_game(request: JoinPrivateGameRequest):
                 )
                 session.add(user)
                 session.flush()
+                print(f"Created new user: id={user.id}, name={request.player_name}")
             
             # Проверяем, нет ли уже игрока в игре
             existing_player = session.query(GamePlayer).filter(
@@ -1114,6 +1168,7 @@ async def join_private_game(request: JoinPrivateGameRequest):
                 )
                 session.add(new_player)
                 session.commit()
+                print(f"Player {user.id} joined private game {game_id}")
             
             return JoinPrivateGameResponse(
                 game_id=game.id,
@@ -1237,6 +1292,8 @@ async def start_private_game(request: StartPrivateGameRequest):
                         total_score=0
                     )
                     session.add(bot_game_player)
+                print(f"Added {bots_needed} bots to private game {game.id} before старт")
+
             game.status = 'pre_start'
             game.started_at = game.started_at or datetime.now(pytz.UTC)
             session.commit()
@@ -1256,6 +1313,8 @@ async def create_round(request: CreateRoundRequest):
     """
     Создать раунд с вопросами (для standalone frontend)
     """
+    print(f"=== CREATE ROUND CALLED === game_id={request.game_id}, round_number={request.round_number}, questions_count={request.questions_count}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1332,6 +1391,9 @@ async def create_round(request: CreateRoundRequest):
             session.flush()
             session.commit()
             
+            print(f"Round created and committed: id={round_obj.id}, questions_count={len(available_questions)}")
+            
+            print(f"Round created: id={round_obj.id}, questions_count={len(available_questions)}")
             return CreateRoundResponse(
                 round_id=round_obj.id,
                 questions_count=len(available_questions)
@@ -1350,6 +1412,8 @@ async def start_round(request: StartRoundRequest):
     """
     Начать раунд (для standalone frontend)
     """
+    print(f"=== START ROUND CALLED === game_id={request.game_id}, round_id={request.round_id}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1389,6 +1453,7 @@ async def start_round(request: StartRoundRequest):
             session.flush()
             session.commit()
             
+            print(f"Round started: round_id={request.round_id}")
             return {"success": True, "message": "Round started"}
             
     except HTTPException:
@@ -1404,6 +1469,8 @@ async def finish_round(request: FinishRoundRequest):
     """
     Завершить раунд (для standalone frontend)
     """
+    print(f"=== FINISH ROUND CALLED === game_id={request.game_id}, round_id={request.round_id}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1432,6 +1499,7 @@ async def finish_round(request: FinishRoundRequest):
             
             session.commit()
             
+            print(f"Round finished: round_id={request.round_id}")
             return {"success": True, "message": "Round finished"}
             
     except HTTPException:
@@ -1447,6 +1515,8 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
     """
     Завершить текущий активный раунд (для standalone frontend)
     """
+    print(f"=== FINISH CURRENT ROUND CALLED === game_id={game_id}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1549,14 +1619,19 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                     # Только один игрок с минимальным счетом
                     eliminated_player, eliminated_score, eliminated_time = players_with_min_score[0]
                 
+                print(f"Elimination logic: min_score={min_score}, players_with_min_score={len(players_with_min_score)}, eliminated_player={eliminated_player.user_id}, time={eliminated_time:.2f}s")
+                
                 # Помечаем игрока как выбывшего
                 eliminated_player.is_eliminated = True
                 eliminated_player.eliminated_round = current_round.round_number
+                print(f"Player {eliminated_player.user_id} eliminated in round {current_round.round_number} (score: {eliminated_score}, time: {eliminated_time:.2f}s)")
+                print(f"DEBUG: Set is_eliminated=True for GamePlayer {eliminated_player.id}, user_id={eliminated_player.user_id}")
                 # Принудительно обновляем объект в сессии
                 session.add(eliminated_player)
                 session.flush()
                 # Проверяем, что значение установлено
                 session.refresh(eliminated_player)
+                print(f"DEBUG: After flush, GamePlayer {eliminated_player.id} is_eliminated={eliminated_player.is_eliminated}")
                 
             # Проверяем, остались ли живые человеческие игроки (не боты)
             remaining_active_humans = session.query(GamePlayer).join(User).filter(
@@ -1574,6 +1649,7 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
             if all_humans_eliminated and game and game.status != 'finished':
                 game.status = 'finished'
                 game.finished_at = datetime.now(pytz.UTC)
+                print(f"Game {game_id} stopped: all human players eliminated, only bots remain")
                 session.add(game)
                 session.flush()
 
@@ -1591,9 +1667,11 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 with get_db_session() as check_session:
                     check_gp = check_session.query(GamePlayer).filter(GamePlayer.id == eliminated_player.id).first()
                     if check_gp:
-                        pass
+                        print(f"DEBUG: After commit (new session), eliminated player {check_gp.user_id} is_eliminated={check_gp.is_eliminated}")
                     else:
-                        pass
+                        print(f"DEBUG: Could not find GamePlayer {eliminated_player.id} in new session")
+            
+            print(f"Current round finished: round_id={current_round.id}, round_number={current_round.round_number}, game_status={game.status if game else 'N/A'}, all_humans_eliminated={all_humans_eliminated}")
             return {
                 "success": True,
                 "round_id": current_round.id,
@@ -1615,6 +1693,8 @@ async def mark_question_displayed(request: MarkQuestionDisplayedRequest):
     """
     Отметить вопрос как показанный (для standalone frontend - frontend сам управляет показом)
     """
+    print(f"=== MARK QUESTION DISPLAYED === round_question_id={request.round_question_id}")
+    
     if not DB_MODELS_AVAILABLE or not _db_session_factory:
         raise HTTPException(status_code=503, detail="Database not available")
     
@@ -1634,6 +1714,8 @@ async def mark_question_displayed(request: MarkQuestionDisplayedRequest):
             if not round_question.displayed_at:
                 round_question.displayed_at = datetime.now(pytz.UTC)
                 session.commit()
+                print(f"Question marked as displayed: round_question_id={request.round_question_id}")
+            
             return {"success": True, "message": "Question marked as displayed"}
             
     except HTTPException:
@@ -1716,6 +1798,8 @@ async def leave_game(request: LeaveGameRequest):
     """
     Покинуть игру (выход из игры через веб-интерфейс)
     """
+    print(f"=== LEAVE GAME CALLED === game_id={request.game_id}, user_id={request.user_id}")
+    
     # Если БД доступна, обновляем статус игрока
     if DB_MODELS_AVAILABLE and _db_session_factory:
         try:
@@ -1735,6 +1819,7 @@ async def leave_game(request: LeaveGameRequest):
                 game_player.left_game = True
                 session.commit()
                 
+                print(f"Player {request.user_id} left game {request.game_id}")
                 # TODO: Уведомить бота о выходе игрока через Redis или другой механизм
                 
                 return {"success": True, "message": "Game left successfully"}
@@ -1748,6 +1833,7 @@ async def leave_game(request: LeaveGameRequest):
             raise HTTPException(status_code=500, detail=f"Error leaving game: {str(e)}")
     
     # Fallback
+    print("Player left the game via web interface (mock)")
     return {"success": True, "message": "Game left successfully"}
 
 @app.post("/api/admin/stop-all-games")
@@ -1791,7 +1877,11 @@ async def stop_all_games(request: AdminStopAllGamesRequest):
                     round_obj.finished_at = datetime.now(pytz.UTC)
                 
                 stopped_count += 1
+                print(f"Stopped game {game.id} (type: {game.game_type}, rounds: {len(active_rounds)})")
+            
             session.commit()
+            
+            print(f"Admin {request.telegram_id} stopped {stopped_count} active games")
             return {
                 "success": True,
                 "stopped_games": stopped_count,

@@ -62,6 +62,7 @@ function App() {
   
   // Обработчик старта игры
   const handleStartGame = async (settings: GameSettings) => {
+    console.log('🎮 Starting game with settings:', settings)
     setGameSettings(settings)
     
     // Сразу скрываем GameSetup и показываем экран загрузки
@@ -95,6 +96,7 @@ function App() {
       }
       
       const data = await response.json()
+      console.log('✅ Game created:', data)
       
       setGameId(data.game_id)
       setUserId(data.user_id)
@@ -114,6 +116,7 @@ function App() {
   }
 
   const handleCreatePrivate = async (playerName: string) => {
+    console.log('🎮 Creating private game:', playerName)
     setShowGameSetup(false)
     setIsCreatingGame(true)
     try {
@@ -149,6 +152,7 @@ function App() {
   }
 
   const handleJoinPrivate = async (playerName: string, roomCode: string) => {
+    console.log('🎮 Joining private game:', roomCode)
     setShowGameSetup(false)
     setIsCreatingGame(true)
     try {
@@ -209,6 +213,7 @@ function App() {
         }
       }
     } catch (error) {
+      console.warn('Failed to fetch private players:', error)
     }
   }
 
@@ -254,6 +259,7 @@ function App() {
         return
       }
     } catch (error) {
+      console.warn('Clipboard API failed, falling back:', error)
     }
     const textarea = document.createElement('textarea')
     textarea.value = text
@@ -290,6 +296,7 @@ function App() {
       }
       
       const roundData = await createResponse.json()
+      console.log('✅ Round created:', roundData)
       
       // Запускаем раунд
       const startResponse = await fetch('/api/round/start', {
@@ -307,6 +314,7 @@ function App() {
         throw new Error('Failed to start round')
       }
       
+      console.log('✅ Round started')
       setRoundNumber(roundNumber)
       roundFinishRequestedRef.current = false
       setShowRoundSummary(false)
@@ -339,14 +347,18 @@ function App() {
           const playerName = data.exists && data.full_name ? data.full_name : `Игрок ${telegramId}`
           setUserInfo({ full_name: playerName })
         })
-        .catch(() => {
+        .catch(err => {
+          console.warn('Failed to load user info:', err)
           setUserInfo({ full_name: `Игрок ${telegramId}` })
         })
     }
   }, [telegramId, userInfo])
   
+  // Логируем полученные параметры
   useEffect(() => {
+    console.log(`🎮 App initialized: game_id=${gameId}, user_id=${userId}, telegram_id=${telegramId}`)
     if (!gameId || !userId) {
+      console.log('ℹ️ No game_id or user_id in URL. Will show game setup.')
     }
   }, [gameId, userId, telegramId])
 
@@ -406,15 +418,24 @@ function App() {
         const questionNum = data.current_question_number || 1
         const totalQ = data.total_questions || 10
         
+        console.log(`📋 fetchLeaderboard: updateQuestionNumber=${updateQuestionNumber}, API returned questionNum=${questionNum}, current state=${currentQuestionNumber}`)
+        
+        // Логируем данные о выбывших игроках
         const participants = data.participants || []
+        const eliminated = participants.filter((p: Participant) => p.is_eliminated === true)
+        if (eliminated.length > 0) {
+          console.log('📋 fetchLeaderboard: Found eliminated participants:', eliminated.map((p: Participant) => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated, correct_answers: p.correct_answers })))
+        }
         
         setParticipants(participants)
         
         // Обновляем номер вопроса только если явно запрошено
         // (чтобы не обновлять счетчик до загрузки вопроса)
         if (updateQuestionNumber) {
+          console.log(`🔄 fetchLeaderboard: Updating currentQuestionNumber from ${currentQuestionNumber} to ${questionNum}`)
           setCurrentQuestionNumber(questionNum)
         } else {
+          console.log(`⏭️ fetchLeaderboard: Skipping question number update (updateQuestionNumber=false)`)
         }
         setTotalQuestions(totalQ)
         
@@ -423,6 +444,7 @@ function App() {
         // НЕ показываем summary по счетчику, так как он может быть неточным
         // НЕ меняем showRoundSummary, если он уже установлен (чтобы не перерисовывать таблицу)
         if (roundCompleted && !showRoundSummary) {
+          console.log(`Setting showRoundSummary=true: roundCompleted=true, questionNum=${questionNum}, totalQ=${totalQ}`)
           setShowRoundSummary(true)
         } else if (!roundCompleted && !showRoundSummary) {
           // Только устанавливаем в false, если summary еще не показывался
@@ -440,8 +462,11 @@ function App() {
   useEffect(() => {
     // Не загружаем лидерборд, если игра не создана
     if (!gameId || !userId) {
+      console.log('⏭️ App: Skipping leaderboard fetch (game not created yet)')
       return
     }
+    
+    console.log('🚀 App: Initial mount, fetching leaderboard')
     // При первой загрузке обновляем счетчик, но он должен быть 0 или 1
     // Если счетчик больше 1, значит вопрос уже загружен, и мы обновим его правильно
     fetchLeaderboard(true) // Первая загрузка с обновлением счетчика
@@ -449,8 +474,10 @@ function App() {
     // НО только если не показывается summary раунда
     const interval = setInterval(() => {
       if (!showRoundSummary && gameId && userId) {
+        console.log('⏰ App: Periodic leaderboard update (no counter update)')
         fetchLeaderboard(false)
       } else {
+        console.log('⏰ App: Skipping periodic update (round summary is showing or game not ready)')
       }
     }, 2000)
     return () => clearInterval(interval)
@@ -473,6 +500,7 @@ function App() {
 
   const handleTimerTimeUp = () => {
     // Когда таймер заканчивается, вызываем handleTimeUp из QuestionViewer для показа правильного ответа
+    console.log('⏰ App: Timer time up, calling QuestionViewer handleTimeUp')
     if (questionViewerTimeUpRef.current) {
       questionViewerTimeUpRef.current()
     }
@@ -488,6 +516,7 @@ function App() {
     
     // Не создаем новый раунд, если игра завершена из-за выбытия всех живых игроков
     if (gameFinishedAllHumansEliminated) {
+      console.log('⚠️ Cannot start next round: all human players eliminated')
       return
     }
     
@@ -498,6 +527,7 @@ function App() {
     
     // Проверяем, не превысили ли мы максимальное количество раундов
     if (nextRoundNumber > totalRounds) {
+      console.log('⚠️ Maximum rounds reached, game finished')
       return
     }
     
@@ -679,7 +709,9 @@ function App() {
             userId={userId}
             onQuestionChange={handleQuestionChange}
             onRoundComplete={async () => {
+              console.log('📊 App: onRoundComplete called, round is completed')
               if (roundFinishRequestedRef.current) {
+                console.log('⚠️ Round finish already requested, skipping duplicate call')
                 return
               }
               roundFinishRequestedRef.current = true
@@ -691,8 +723,11 @@ function App() {
                   })
                   if (finishResponse.ok) {
                     const finishData = await finishResponse.json()
+                    console.log(`✅ Round ${roundNumber} finished in onRoundComplete:`, finishData)
+                    
                     // Проверяем, остановлена ли игра из-за выбытия всех живых игроков
                     if (finishData.all_humans_eliminated === true || finishData.game_status === 'finished') {
+                      console.log('⚠️ Game finished: all human players eliminated')
                       setGameFinishedAllHumansEliminated(true)
                     }
                   }
@@ -711,6 +746,7 @@ function App() {
               await fetchLeaderboard(true)
             }}
             onQuestionLoaded={(question) => {
+              console.log('📊 App: onQuestionLoaded called, fetching leaderboard with counter update')
               setCurrentQuestion(question)
               fetchLeaderboard(true)
             }} // Обновляем счетчик только после загрузки вопроса
