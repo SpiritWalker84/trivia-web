@@ -15,7 +15,15 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
   useEffect(() => {
     // Фильтруем участников, у которых есть id и валидные данные
     const validParticipants = participants.filter(p => p && p.id && p.name)
-    const sorted = [...validParticipants].sort((a, b) => b.correct_answers - a.correct_answers)
+    // Сортируем: сначала активные (по убыванию очков), потом выбывшие (по убыванию очков)
+    const sorted = [...validParticipants].sort((a, b) => {
+      // Сначала активные, потом выбывшие
+      if (a.is_eliminated !== b.is_eliminated) {
+        return a.is_eliminated ? 1 : -1
+      }
+      // Внутри группы сортируем по очкам
+      return b.correct_answers - a.correct_answers
+    })
     setSortedParticipants(sorted)
   }, [participants])
 
@@ -49,33 +57,42 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
             Нет участников
           </div>
         ) : (
-          sortedParticipants.map((participant, index) => (
-            <motion.div
-              key={participant.id}
-              className={`leaderboard-item ${getRankClass(index)} ${
-                participant.is_current_user ? 'current-user' : ''
-              }`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.2 }}
-              whileHover={{ x: 4, transition: { duration: 0.2 } }}
-            >
-              <div className="leaderboard-rank">
-                <span className="rank-icon">{getRankIcon(index)}</span>
-              </div>
-              <div className="leaderboard-info">
-                <div className="leaderboard-name">
-                  {participant.name}
-                  {participant.is_current_user && (
-                    <span className="you-badge">Вы</span>
-                  )}
+          sortedParticipants.map((participant, index) => {
+            const isEliminated = participant.is_eliminated
+            // Для выбывших игроков не показываем ранг, а показываем иконку
+            const activeIndex = sortedParticipants.filter(p => !p.is_eliminated).indexOf(participant)
+            const rankIndex = isEliminated ? -1 : activeIndex
+            
+            return (
+              <motion.div
+                key={participant.id}
+                className={`leaderboard-item ${isEliminated ? 'eliminated' : getRankClass(rankIndex)} ${
+                  participant.is_current_user ? 'current-user' : ''
+                }`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: isEliminated ? 0.5 : 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.2 }}
+                whileHover={isEliminated ? {} : { x: 4, transition: { duration: 0.2 } }}
+              >
+                <div className="leaderboard-rank">
+                  <span className="rank-icon">
+                    {isEliminated ? '💀' : getRankIcon(rankIndex)}
+                  </span>
                 </div>
-              </div>
-              <div className="leaderboard-score-badge">
-                {participant.correct_answers}
-              </div>
-            </motion.div>
-          ))
+                <div className="leaderboard-info">
+                  <div className="leaderboard-name">
+                    {participant.name}
+                    {participant.is_current_user && (
+                      <span className="you-badge">Вы</span>
+                    )}
+                  </div>
+                </div>
+                <div className={`leaderboard-score-badge ${isEliminated ? 'eliminated-score' : ''}`}>
+                  {isEliminated ? '—' : participant.correct_answers}
+                </div>
+              </motion.div>
+            )
+          })
         )}
       </div>
     </motion.div>

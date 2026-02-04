@@ -61,13 +61,19 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
   const offset = circumference - (progress / 100) * circumference
 
   const isLastRound = roundNumber >= totalRounds
-  const sortedParticipants = [...validParticipants].sort((a, b) => b.correct_answers - a.correct_answers)
+  // Сортируем: сначала активные (по убыванию очков), потом выбывшие
+  const sortedParticipants = [...validParticipants].sort((a, b) => {
+    // Сначала активные, потом выбывшие
+    if (a.is_eliminated !== b.is_eliminated) {
+      return a.is_eliminated ? 1 : -1
+    }
+    // Внутри группы сортируем по очкам
+    return b.correct_answers - a.correct_answers
+  })
   
-  // Определяем выбывшего игрока - только один, кто занял последнее место (последний в отсортированном списке)
-  // Если несколько игроков с одинаковым минимальным счетом, выбывает последний в списке
-  const eliminatedParticipant = sortedParticipants.length > 0 ? sortedParticipants[sortedParticipants.length - 1] : null
-  const eliminatedParticipants = eliminatedParticipant ? [eliminatedParticipant] : []
-  const activeParticipants = sortedParticipants.slice(0, -1) // Все кроме последнего
+  // Разделяем на активных и выбывших
+  const activeParticipants = sortedParticipants.filter(p => !p.is_eliminated)
+  const eliminatedParticipants = sortedParticipants.filter(p => p.is_eliminated)
 
   const getRankIcon = (index: number) => {
     if (index === 0) return '🥇'

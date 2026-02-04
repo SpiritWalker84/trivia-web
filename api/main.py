@@ -542,6 +542,12 @@ async def submit_answer(answer: AnswerRequest):
                 if not game_player:
                     raise HTTPException(status_code=404, detail="Game player not found")
                 
+                # Проверяем, не выбыл ли игрок
+                if game_player.is_eliminated:
+                    # Выбывший игрок может отвечать, но очки не засчитываются
+                    print(f"Eliminated player {answer.user_id} answered, but points won't be counted")
+                    return {"success": True, "correct": is_correct, "eliminated": True}
+                
                 # Проверяем, не ответил ли уже пользователь на этот вопрос
                 existing_answer = session.query(AnswerModel).filter(
                     and_(
@@ -633,11 +639,10 @@ async def get_leaderboard(
                 if not current_round:
                     raise HTTPException(status_code=404, detail="No rounds found for this game")
                 
-                # Получаем участников игры (не выбывших)
+                # Получаем всех участников игры (включая выбывших)
                 game_players = session.query(GamePlayer).filter(
                     and_(
                         GamePlayer.game_id == game_id,
-                        GamePlayer.is_eliminated == False,
                         GamePlayer.left_game == False
                     )
                 ).all()
@@ -664,7 +669,8 @@ async def get_leaderboard(
                         "name": gp.user.full_name or gp.user.username or f"User {gp.user.id}",
                         "correct_answers": correct_count,
                         "avatar": None,
-                        "is_current_user": gp.user_id == user_id if user_id else False
+                        "is_current_user": gp.user_id == user_id if user_id else False,
+                        "is_eliminated": gp.is_eliminated
                     })
                 
                 # Сортируем по убыванию правильных ответов
@@ -1139,6 +1145,53 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
             # Завершаем раунд
             current_round.status = 'finished'
             current_round.finished_at = datetime.now(pytz.UTC)
+            
+            # Выбываем игрока с наименьшим количеством правильных ответов в этом раунде
+            # Получаем всех активных игроков
+            active_players = session.query(GamePlayer).filter(
+                and_(
+                    GamePlayer.game_id == game_id,
+                    GamePlayer.is_eliminated == False,
+                    GamePlayer.left_game == False
+                )
+            ).all()
+            
+            if len(active_players) > 1:  # Выбываем только если осталось больше 1 игрока
+                # Считаем правильные ответы для каждого игрока в этом раунде
+                player_scores = []
+                for gp in active_players:
+                    correct_count = session.query(func.count(AnswerModel.id)).filter(
+                        and_(
+                            AnswerModel.round_id == current_round.id,
+                            AnswerModel.user_id == gp.user_id,
+                            AnswerModel.is_correct == True
+                        )
+                    ).scalar() or 0
+                    player_scores.append((gp, correct_count))
+                
+                # Сортируем по количеству правильных ответов (по возрастанию)
+                player_scores.sort(key=lambda x: x[1])
+                
+                # Выбывает игрок с наименьшим количеством правильных ответов
+                # Если несколько игроков с одинаковым минимальным счетом, выбывает последний в списке
+                eliminated_player, eliminated_score = player_scores[0]
+                
+                # Проверяем, есть ли другие игроки с таким же минимальным счетом
+                min_score = eliminated_score
+                players_with_min_score = [p for p, s in player_scores if s == min_score]
+                
+                # Выбывает последний в списке среди игроков с минимальным счетом
+                if len(players_with_min_score) > 1:
+                    # Находим последнего игрока с минимальным счетом
+                    for i in range(len(player_scores) - 1, -1, -1):
+                        if player_scores[i][1] == min_score:
+                            eliminated_player = player_scores[i][0]
+                            break
+                
+                # Помечаем игрока как выбывшего
+                eliminated_player.is_eliminated = True
+                eliminated_player.eliminated_round = current_round.round_number
+                print(f"Player {eliminated_player.user_id} eliminated in round {current_round.round_number}")
             
             # Проверяем, нужно ли завершить игру
             game = session.query(Game).filter(Game.id == game_id).first()

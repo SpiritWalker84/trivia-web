@@ -26,6 +26,7 @@ export interface Participant {
   correct_answers: number // Количество правильных ответов за раунд
   avatar?: string
   is_current_user?: boolean
+  is_eliminated?: boolean // Флаг выбывшего игрока
 }
 
 export interface LeaderboardData {
