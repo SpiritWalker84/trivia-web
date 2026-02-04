@@ -32,7 +32,7 @@ try:
             break
     
     from db_models import (
-        Game, GamePlayer, Round, RoundQuestion, Question, Answer as AnswerModel,
+        Game, GamePlayer, Round, RoundQuestion, Question as DBQuestion, Answer as AnswerModel,
         User, Theme
     )
     DB_MODELS_AVAILABLE = True
@@ -42,7 +42,7 @@ except ImportError as e:
     print(f"Python path: {sys.path}")
     print("Will use mock data")
     DB_MODELS_AVAILABLE = False
-    Game = GamePlayer = Round = RoundQuestion = Question = AnswerModel = User = Theme = None
+    Game = GamePlayer = Round = RoundQuestion = DBQuestion = AnswerModel = User = Theme = None
 
 # Загружаем переменные окружения из .env
 load_dotenv()
@@ -329,7 +329,7 @@ async def get_random_question(
                     raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
                 
                 # Получаем сам вопрос
-                db_question = session.query(Question).filter(Question.id == round_question.question_id).first()
+                db_question = session.query(DBQuestion).filter(DBQuestion.id == round_question.question_id).first()
                 if not db_question:
                     raise HTTPException(status_code=404, detail="Question not found")
                 
