@@ -389,7 +389,6 @@ function App() {
           roundNumber={roundNumber}
           totalRounds={totalRounds}
           onNextRound={handleNextRound}
-          onLeaveGame={handleLeaveGame}
         />
       </div>
     )
@@ -415,9 +414,16 @@ function App() {
           >
             Раунд {roundNumber} • Вопрос {currentQuestionNumber} из {totalQuestions}
           </motion.div>
-          <div className="header-timer">
-            <QuestionTimer questionId={questionId} gameId={gameId} userId={userId} />
-          </div>
+          {currentQuestion && !showRoundSummary && (
+            <div className="header-timer">
+              <Timer
+                key={currentQuestion.id}
+                initialTime={currentQuestion.time_limit || 10}
+                onTimeUp={() => {}}
+                isActive={true}
+              />
+            </div>
+          )}
         </div>
       </header>
       <div className="app-content">
