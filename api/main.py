@@ -453,18 +453,28 @@ async def get_random_question(
                 round_question = None
                 if displayed_question and displayed_question.displayed_at:
                     time_limit = displayed_question.time_limit_sec or 10
-                    # Дополнительная пауза между вопросами (2.5 сек)
-                    active_until = displayed_question.displayed_at + timedelta(seconds=time_limit + 2.5)
-                    if now <= active_until:
-                        # Если пользователь уже ответил на этот вопрос, переходим к следующему
-                        answered = session.query(AnswerModel.id).filter(
+                    active_until = displayed_question.displayed_at + timedelta(seconds=time_limit)
+                    # Считаем ответы активных игроков (люди + боты)
+                    active_players = session.query(GamePlayer).filter(
+                        and_(
+                            GamePlayer.game_id == game_id,
+                            GamePlayer.is_eliminated == False,
+                            GamePlayer.left_game == False
+                        )
+                    ).all()
+                    active_user_ids = [p.user_id for p in active_players]
+                    answered_count = 0
+                    if active_user_ids:
+                        answered_count = session.query(func.count(AnswerModel.id)).filter(
                             and_(
                                 AnswerModel.round_question_id == displayed_question.id,
-                                AnswerModel.user_id == user_id
+                                AnswerModel.user_id.in_(active_user_ids)
                             )
-                        ).first()
-                        if not answered:
-                            round_question = displayed_question
+                        ).scalar() or 0
+
+                    # Если не все ответили и время не вышло — держим текущий вопрос
+                    if now <= active_until and answered_count < len(active_user_ids):
+                        round_question = displayed_question
 
                 if not round_question:
                     # Берем первый непоказанный вопрос

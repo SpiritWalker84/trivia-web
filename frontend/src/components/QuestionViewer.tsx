@@ -82,10 +82,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const fetchQuestion = async (id: number) => {
     setLoading(true)
     setError(null)
-    setSelectedAnswer(null)
-    setShowResult(false)
-    setTimeExpired(false)
-    setTimerKey(prev => prev + 1)
 
     try {
       const response = await fetch(`/api/questions/${id}`)
@@ -196,8 +192,24 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
         questionText: data.question.text?.substring(0, 50) + '...'
       })
       
+      const newQuestionId = data.question.id
+      const newRoundQuestionId = data.round_question_id || null
+      const isSameQuestion = newQuestionId === question?.id && newRoundQuestionId === roundQuestionId
+
+      if (isSameQuestion) {
+        console.log('⏸️ fetchRandomQuestion: Same question returned, keeping current view')
+        setLoading(false)
+        isNextQuestionScheduled.current = false
+        return
+      }
+
+      setSelectedAnswer(null)
+      setShowResult(false)
+      setTimeExpired(false)
+      setTimerKey(prev => prev + 1)
+
       setQuestion(data.question)
-      setRoundQuestionId(data.round_question_id || null)
+      setRoundQuestionId(newRoundQuestionId)
       // Сохраняем время загрузки вопроса для вычисления времени ответа
       questionLoadTimeRef.current = Date.now()
       // Обновляем previousQuestionIdRef после успешной загрузки
