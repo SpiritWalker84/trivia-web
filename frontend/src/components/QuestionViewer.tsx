@@ -47,8 +47,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     
     // Если questionId изменился, но это тот же вопрос, который уже загружен, не перезагружаем
     if (questionId && question?.id !== questionId) {
-      console.log(`📥 useEffect: Fetching question by ID: ${questionId} (current question: ${question?.id})`)
-      fetchQuestion(questionId)
+      // В игровом потоке используем /api/questions/random, чтобы не ловить 404 из mock /api/questions/{id}
+      if (!gameId || !userId) {
+        console.log(`📥 useEffect: Fetching question by ID: ${questionId} (current question: ${question?.id})`)
+        fetchQuestion(questionId)
+      } else {
+        console.log(`⏭️ useEffect: Skipping fetchQuestion (game flow uses /api/questions/random)`)
+      }
       previousQuestionIdRef.current = questionId
     } else if (!questionId) {
       // Если questionId стал null, это означает, что нужно загрузить следующий вопрос
