@@ -640,6 +640,339 @@ class LeaveGameRequest(BaseModel):
     game_id: int
     user_id: int
 
+# Модели для создания игры (standalone frontend)
+class CreateGameRequest(BaseModel):
+    game_type: str = "quick"  # 'quick', 'training', 'private'
+    theme_id: Optional[int] = None  # NULL = mixed
+    total_rounds: int = 9
+    player_name: str  # Имя игрока (для создания/получения User)
+    player_telegram_id: Optional[int] = None  # Если есть telegram_id
+
+class CreateGameResponse(BaseModel):
+    game_id: int
+    user_id: int
+    game_type: str
+    total_rounds: int
+
+class CreateRoundRequest(BaseModel):
+    game_id: int
+    round_number: int
+    theme_id: Optional[int] = None
+    questions_count: int = 10
+
+class CreateRoundResponse(BaseModel):
+    round_id: int
+    questions_count: int
+
+class StartRoundRequest(BaseModel):
+    game_id: int
+    round_id: int
+
+class FinishRoundRequest(BaseModel):
+    game_id: int
+    round_id: int
+
+class MarkQuestionDisplayedRequest(BaseModel):
+    round_question_id: int
+
+@app.post("/api/game/create", response_model=CreateGameResponse)
+async def create_game(request: CreateGameRequest):
+    """
+    Создать новую игру (для standalone frontend)
+    """
+    print(f"=== CREATE GAME CALLED === game_type={request.game_type}, player_name={request.player_name}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Создаем или получаем пользователя
+            user = None
+            if request.player_telegram_id:
+                # Ищем по telegram_id
+                user = session.query(User).filter(User.telegram_id == request.player_telegram_id).first()
+            
+            if not user:
+                # Создаем нового пользователя
+                user = User(
+                    telegram_id=request.player_telegram_id,
+                    username=request.player_name,
+                    full_name=request.player_name,
+                    is_bot=False
+                )
+                session.add(user)
+                session.flush()  # Получаем user.id
+                print(f"Created new user: id={user.id}, name={request.player_name}")
+            else:
+                print(f"Using existing user: id={user.id}, name={user.full_name}")
+            
+            # Создаем игру
+            game = Game(
+                game_type=request.game_type,
+                creator_id=user.id,
+                theme_id=request.theme_id,
+                status='waiting',
+                total_rounds=request.total_rounds,
+                current_round=0
+            )
+            session.add(game)
+            session.flush()  # Получаем game.id
+            
+            # Добавляем игрока в игру
+            game_player = GamePlayer(
+                game_id=game.id,
+                user_id=user.id,
+                is_bot=False,
+                join_order=1,
+                total_score=0
+            )
+            session.add(game_player)
+            session.commit()
+            
+            print(f"Game created: id={game.id}, user_id={user.id}")
+            return CreateGameResponse(
+                game_id=game.id,
+                user_id=user.id,
+                game_type=game.game_type,
+                total_rounds=game.total_rounds
+            )
+            
+    except Exception as e:
+        print(f"Error creating game: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error creating game: {str(e)}")
+
+@app.post("/api/round/create", response_model=CreateRoundResponse)
+async def create_round(request: CreateRoundRequest):
+    """
+    Создать раунд с вопросами (для standalone frontend)
+    """
+    print(f"=== CREATE ROUND CALLED === game_id={request.game_id}, round_number={request.round_number}, questions_count={request.questions_count}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Проверяем игру
+            game = session.query(Game).filter(Game.id == request.game_id).first()
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            # Проверяем, что раунд с таким номером еще не создан
+            existing_round = session.query(Round).filter(
+                and_(
+                    Round.game_id == request.game_id,
+                    Round.round_number == request.round_number
+                )
+            ).first()
+            
+            if existing_round:
+                raise HTTPException(status_code=400, detail=f"Round {request.round_number} already exists")
+            
+            # Получаем уже использованные вопросы в этой игре
+            used_question_ids = set()
+            if hasattr(game, 'used_questions'):
+                for uq in game.used_questions:
+                    used_question_ids.add(uq.question_id)
+            
+            # Получаем вопросы из БД (исключая использованные)
+            query = session.query(DBQuestion).filter(~DBQuestion.id.in_(used_question_ids))
+            
+            # Фильтр по теме, если указана
+            if request.theme_id:
+                query = query.filter(DBQuestion.theme_id == request.theme_id)
+            
+            # Получаем случайные вопросы
+            available_questions = query.order_by(func.random()).limit(request.questions_count).all()
+            
+            if len(available_questions) < request.questions_count:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Not enough questions available. Found {len(available_questions)}, requested {request.questions_count}"
+                )
+            
+            # Создаем раунд
+            round_obj = Round(
+                game_id=request.game_id,
+                round_number=request.round_number,
+                theme_id=request.theme_id,
+                status='not_started'
+            )
+            session.add(round_obj)
+            session.flush()  # Получаем round_obj.id
+            
+            # Создаем RoundQuestion для каждого вопроса
+            for idx, question in enumerate(available_questions, start=1):
+                round_question = RoundQuestion(
+                    round_id=round_obj.id,
+                    question_id=question.id,
+                    question_number=idx,
+                    time_limit_sec=20  # По умолчанию 20 секунд
+                )
+                session.add(round_question)
+                
+                # Отмечаем вопрос как использованный в игре
+                # TODO: Если есть модель GameUsedQuestion, добавить запись
+            
+            session.commit()
+            
+            print(f"Round created: id={round_obj.id}, questions_count={len(available_questions)}")
+            return CreateRoundResponse(
+                round_id=round_obj.id,
+                questions_count=len(available_questions)
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating round: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error creating round: {str(e)}")
+
+@app.post("/api/round/start")
+async def start_round(request: StartRoundRequest):
+    """
+    Начать раунд (для standalone frontend)
+    """
+    print(f"=== START ROUND CALLED === game_id={request.game_id}, round_id={request.round_id}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Проверяем игру
+            game = session.query(Game).filter(Game.id == request.game_id).first()
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            # Проверяем раунд
+            round_obj = session.query(Round).filter(Round.id == request.round_id).first()
+            if not round_obj:
+                raise HTTPException(status_code=404, detail="Round not found")
+            
+            if round_obj.game_id != request.game_id:
+                raise HTTPException(status_code=400, detail="Round does not belong to this game")
+            
+            # Обновляем статус игры и раунда
+            if game.status == 'waiting':
+                game.status = 'in_progress'
+                game.started_at = datetime.now(pytz.UTC)
+            
+            game.current_round = round_obj.round_number
+            round_obj.status = 'in_progress'
+            round_obj.started_at = datetime.now(pytz.UTC)
+            
+            session.commit()
+            
+            print(f"Round started: round_id={request.round_id}")
+            return {"success": True, "message": "Round started"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error starting round: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error starting round: {str(e)}")
+
+@app.post("/api/round/finish")
+async def finish_round(request: FinishRoundRequest):
+    """
+    Завершить раунд (для standalone frontend)
+    """
+    print(f"=== FINISH ROUND CALLED === game_id={request.game_id}, round_id={request.round_id}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Проверяем раунд
+            round_obj = session.query(Round).filter(Round.id == request.round_id).first()
+            if not round_obj:
+                raise HTTPException(status_code=404, detail="Round not found")
+            
+            if round_obj.game_id != request.game_id:
+                raise HTTPException(status_code=400, detail="Round does not belong to this game")
+            
+            # Завершаем раунд
+            round_obj.status = 'finished'
+            round_obj.finished_at = datetime.now(pytz.UTC)
+            
+            # Проверяем, нужно ли завершить игру
+            game = session.query(Game).filter(Game.id == request.game_id).first()
+            if round_obj.round_number >= game.total_rounds:
+                game.status = 'finished'
+                game.finished_at = datetime.now(pytz.UTC)
+            
+            session.commit()
+            
+            print(f"Round finished: round_id={request.round_id}")
+            return {"success": True, "message": "Round finished"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error finishing round: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error finishing round: {str(e)}")
+
+@app.post("/api/question/mark-displayed")
+async def mark_question_displayed(request: MarkQuestionDisplayedRequest):
+    """
+    Отметить вопрос как показанный (для standalone frontend - frontend сам управляет показом)
+    """
+    print(f"=== MARK QUESTION DISPLAYED === round_question_id={request.round_question_id}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            round_question = session.query(RoundQuestion).filter(
+                RoundQuestion.id == request.round_question_id
+            ).first()
+            
+            if not round_question:
+                raise HTTPException(status_code=404, detail="Round question not found")
+            
+            # Отмечаем как показанный
+            if not round_question.displayed_at:
+                round_question.displayed_at = datetime.now(pytz.UTC)
+                session.commit()
+                print(f"Question marked as displayed: round_question_id={request.round_question_id}")
+            
+            return {"success": True, "message": "Question marked as displayed"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error marking question as displayed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error marking question: {str(e)}")
+
 @app.post("/api/game/leave")
 async def leave_game(request: LeaveGameRequest):
     """
