@@ -334,6 +334,12 @@ function App() {
       return
     }
     
+    // Не создаем новый раунд, если игра завершена из-за выбытия всех живых игроков
+    if (gameFinishedAllHumansEliminated) {
+      console.log('⚠️ Cannot start next round: all human players eliminated')
+      return
+    }
+    
     const nextRoundNumber = roundNumber + 1
     
     // Завершаем текущий раунд (если есть)
@@ -352,7 +358,7 @@ function App() {
           // Проверяем статус игры - если игра остановлена (все человеческие игроки выбыли), не создаем новый раунд
           if (finishData.game_status === 'finished') {
             console.log('⚠️ Game is finished (all human players eliminated), stopping')
-            alert('Игра завершена: все человеческие игроки выбыли')
+            setGameFinishedAllHumansEliminated(true)
             return
           }
         } else {
