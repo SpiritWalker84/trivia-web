@@ -338,9 +338,9 @@ def answer_for_bots_sync(session: Session, game_id: int, round_question_id: int,
             if existing_answer:
                 continue  # Бот уже ответил
             
-            # Получаем уровень сложности бота
+            # Получаем уровень сложности бота (предпочитаем настройку в рамках игры)
             bot_user = session.query(User).filter(User.id == bot_player.user_id).first()
-            bot_difficulty = bot_user.bot_difficulty if bot_user else 'amateur'
+            bot_difficulty = bot_player.bot_difficulty or (bot_user.bot_difficulty if bot_user else None) or 'amateur'
             
             # Определяем точность бота в зависимости от уровня сложности
             # Подбираем более мягкие проценты, чтобы боты не брали 9-10/10 на среднем
