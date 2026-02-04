@@ -79,7 +79,7 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
                   participant.is_current_user ? 'current-user' : ''
                 }`}
                 initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: isEliminated ? 0.5 : 1, y: 0 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05, duration: 0.2 }}
                 whileHover={isEliminated ? {} : { x: 4, transition: { duration: 0.2 } }}
               >
