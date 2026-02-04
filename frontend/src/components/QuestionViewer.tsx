@@ -99,6 +99,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
   const fetchRandomQuestion = async (retryCount = 0, options: { silent?: boolean } = {}) => {
     const preserveState = options.silent || (showResult && !!question && !!roundQuestionId)
+    let keepLoading = false
     // Защита от повторных вызовов
     if (isNextQuestionScheduled.current && retryCount === 0) {
       console.warn('⚠️ fetchRandomQuestion: Already scheduled, skipping. isNextQuestionScheduled=true')
@@ -142,6 +143,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           
           if (retryCount < 30) {
             // Повторяем попытку через 1 секунду
+            keepLoading = true
+            setError(null)
             setTimeout(() => {
               fetchRandomQuestion(retryCount + 1)
             }, 1000)
@@ -162,6 +165,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           // Если это "No active round found" или "Game is not in progress", пробуем повторить
           if ((errorDetail.includes('No active round') || errorDetail.includes('not in progress')) && retryCount < 30) {
             console.log(`🔄 fetchRandomQuestion: Retrying in 1 second...`)
+            keepLoading = true
+            setError(null)
             setTimeout(() => {
               fetchRandomQuestion(retryCount + 1)
             }, 1000)
@@ -183,6 +188,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       if (!data || !data.question) {
         console.warn('⚠️ fetchRandomQuestion: Invalid response, retrying...', data)
         if (retryCount < 5) {
+          keepLoading = true
+          setError(null)
           setTimeout(() => {
             fetchRandomQuestion(retryCount + 1)
           }, 1000)
@@ -265,11 +272,22 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       isNextQuestionScheduled.current = false
     } catch (err) {
       console.error('❌ fetchRandomQuestion: Error:', err)
+      // Краткий авто-ретрай для сетевых/временных ошибок без показа красного текста
+      if (retryCount < 3) {
+        keepLoading = true
+        setError(null)
+        setTimeout(() => {
+          fetchRandomQuestion(retryCount + 1)
+        }, 1000)
+        return
+      }
       setError(err instanceof Error ? err.message : 'Произошла ошибка')
       // При ошибке сбрасываем флаг, чтобы можно было повторить
       isNextQuestionScheduled.current = false
     } finally {
-      setLoading(false)
+      if (!keepLoading) {
+        setLoading(false)
+      }
     }
   }
 
@@ -429,7 +447,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           animate={{ opacity: 1, y: 0 }}
         >
           <p>{error}</p>
-          <button onClick={fetchRandomQuestion} className="btn btn-primary">
+          <button onClick={() => fetchRandomQuestion()} className="btn btn-primary">
             Попробовать снова
           </button>
         </motion.div>
