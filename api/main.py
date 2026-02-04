@@ -315,11 +315,12 @@ def answer_for_bots_sync(session: Session, game_id: int, round_question_id: int,
             bot_difficulty = bot_user.bot_difficulty if bot_user else 'amateur'
             
             # Определяем точность бота в зависимости от уровня сложности
+            # Подбираем более мягкие проценты, чтобы боты не брали 9-10/10 на среднем
             accuracy = {
-                'novice': 0.55,
-                'amateur': 0.68,
-                'expert': 0.80
-            }.get(bot_difficulty, 0.68)
+                'novice': 0.45,
+                'amateur': 0.55,
+                'expert': 0.70
+            }.get(bot_difficulty, 0.55)
             
             # Бот отвечает правильно с вероятностью accuracy
             is_correct = random.random() < accuracy
