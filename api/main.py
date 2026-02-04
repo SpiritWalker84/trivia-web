@@ -821,7 +821,7 @@ async def create_round(request: CreateRoundRequest):
                     round_id=round_obj.id,
                     question_id=question.id,
                     question_number=idx,
-                    time_limit_sec=20  # По умолчанию 20 секунд
+                    time_limit_sec=10  # По умолчанию 10 секунд
                 )
                 session.add(round_question)
                 
