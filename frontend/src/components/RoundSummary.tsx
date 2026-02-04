@@ -11,7 +11,7 @@ interface RoundSummaryProps {
   gameFinishedAllHumansEliminated?: boolean // Игра завершена: все живые игроки выбыли
 }
 
-const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: RoundSummaryProps) => {
+const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, gameFinishedAllHumansEliminated = false }: RoundSummaryProps) => {
   const [timeLeft, setTimeLeft] = useState(30)
   const [progress, setProgress] = useState(100)
   
@@ -20,6 +20,11 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
 
   // Автоматический таймер на 30 секунд
   useEffect(() => {
+    // Не запускаем таймер, если игра завершена из-за выбытия всех живых игроков
+    if (gameFinishedAllHumansEliminated) {
+      return
+    }
+    
     if (totalRounds && roundNumber >= totalRounds) {
       // Если это последний раунд, не запускаем таймер
       return
@@ -46,7 +51,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [roundNumber, totalRounds, onNextRound])
+  }, [roundNumber, totalRounds, onNextRound, gameFinishedAllHumansEliminated])
 
   // Определяем цвет таймера
   const timerColor = useMemo(() => {
@@ -62,7 +67,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
   
   // Обновляем таймер для 30 секунд вместо 60
 
-  const isLastRound = roundNumber >= totalRounds
+  const isLastRound = roundNumber >= totalRounds || gameFinishedAllHumansEliminated
   // Сортируем: сначала активные (по убыванию очков), потом выбывшие
   const sortedParticipants = [...validParticipants].sort((a, b) => {
     // Сначала активные, потом выбывшие (явно проверяем на true)
@@ -123,7 +128,11 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          {isLastRound ? '🎉 Игра завершена!' : `Раунд ${roundNumber} завершен`}
+          {gameFinishedAllHumansEliminated 
+            ? '⛔ Игра завершена' 
+            : isLastRound 
+              ? '🎉 Игра завершена!' 
+              : `Раунд ${roundNumber} завершен`}
         </motion.h2>
         <motion.p
           className="round-summary-subtitle"
@@ -131,9 +140,11 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          {isLastRound 
-            ? 'Финальные результаты' 
-            : 'Итоги раунда'}
+          {gameFinishedAllHumansEliminated
+            ? 'Все живые игроки выбыли'
+            : isLastRound 
+              ? 'Финальные результаты' 
+              : 'Итоги раунда'}
         </motion.p>
       </div>
 
@@ -230,8 +241,35 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
           </div>
         </div>
 
-        {/* Таймер до следующего раунда справа */}
-        {!isLastRound && (
+        {/* Таймер до следующего раунда справа или сообщение о завершении */}
+        {gameFinishedAllHumansEliminated ? (
+          <motion.div
+            className="round-timer-container"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 1.0 }}
+          >
+            <div className="round-timer-wrapper">
+              <div className="game-finished-message">
+                <div className="finished-icon">⛔</div>
+                <div className="finished-text">
+                  <h3>Игра завершена</h3>
+                  <p>Все живые игроки выбыли</p>
+                </div>
+                <motion.button
+                  className="btn-return-to-menu"
+                  onClick={() => {
+                    window.location.href = '/'
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Вернуться в меню
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        ) : !isLastRound && (
           <motion.div
             className="round-timer-container"
             initial={{ opacity: 0, scale: 0.9 }}

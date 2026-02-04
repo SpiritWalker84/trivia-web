@@ -482,6 +482,12 @@ function App() {
                   if (finishResponse.ok) {
                     const finishData = await finishResponse.json()
                     console.log(`✅ Round ${roundNumber} finished in onRoundComplete:`, finishData)
+                    
+                    // Проверяем, остановлена ли игра из-за выбытия всех живых игроков
+                    if (finishData.game_status === 'finished') {
+                      console.log('⚠️ Game finished: all human players eliminated')
+                      setGameFinishedAllHumansEliminated(true)
+                    }
                   }
                 } catch (error) {
                   console.error('Error finishing current round in onRoundComplete:', error)
