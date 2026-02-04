@@ -426,6 +426,7 @@ function App() {
           roundNumber={roundNumber}
           totalRounds={totalRounds}
           onNextRound={handleNextRound}
+          gameFinishedAllHumansEliminated={gameFinishedAllHumansEliminated}
         />
       </div>
     )
