@@ -17,6 +17,7 @@ export interface Answer {
 
 export interface QuestionResponse {
   question: Question
+  round_question_id?: number  // ID вопроса в раунде (RoundQuestion.id)
 }
 
 export interface Participant {

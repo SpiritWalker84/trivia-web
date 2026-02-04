@@ -21,6 +21,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [timerKey, setTimerKey] = useState(0)
+  const [roundQuestionId, setRoundQuestionId] = useState<number | null>(null)
   const nextQuestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isNextQuestionScheduled = useRef(false)
   const hasInitialQuestionLoaded = useRef(false)
@@ -99,6 +100,15 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       console.log(`📡 fetchRandomQuestion: Making API call to ${url.toString()}...`)
       const response = await fetch(url.toString())
       if (!response.ok) {
+        if (response.status === 202) {
+          // Игра ожидает начала
+          const errorData = await response.json().catch(() => ({ detail: 'Game is waiting to start' }))
+          console.log('⏳ fetchRandomQuestion: Game is waiting to start (202)')
+          setError(errorData.detail || 'Игра ожидает начала')
+          setLoading(false)
+          isNextQuestionScheduled.current = false
+          return
+        }
         if (response.status === 400) {
           // Раунд завершен, вызываем callback для показа summary
           console.log('✅ fetchRandomQuestion: Round completed (400)')
@@ -113,10 +123,12 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       const data = await response.json()
       console.log('✅ fetchRandomQuestion: Question loaded from API:', {
         questionId: data.question.id,
+        roundQuestionId: data.round_question_id,
         questionText: data.question.text.substring(0, 50) + '...'
       })
       
       setQuestion(data.question)
+      setRoundQuestionId(data.round_question_id || null)
       
       // Уведомляем о загрузке вопроса - это обновит счетчик в App
       // Вызываем СРАЗУ после установки вопроса
@@ -227,9 +239,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           is_correct: isCorrect,
           game_id: gameId,
           user_id: userId,
+          round_question_id: roundQuestionId,
           selected_option: optionLetter,
           answer_time: answerTime,
-          // round_question_id будет получен из API при следующем запросе вопроса
         }),
       })
 

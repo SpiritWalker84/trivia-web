@@ -130,6 +130,7 @@ class Question(BaseModel):
 
 class QuestionResponse(BaseModel):
     question: Question
+    round_question_id: Optional[int] = None  # ID вопроса в раунде (RoundQuestion.id)
 
 class Participant(BaseModel):
     id: int
@@ -285,7 +286,9 @@ async def get_random_question(
                 if not game:
                     raise HTTPException(status_code=404, detail="Game not found")
                 
-                if game.status != 'in_progress':
+                if game.status == 'waiting' or game.status == 'pre_start':
+                    raise HTTPException(status_code=202, detail="Game is waiting to start")
+                elif game.status != 'in_progress':
                     raise HTTPException(status_code=400, detail=f"Game is not in progress (status: {game.status})")
                 
                 # Получаем текущий раунд
@@ -304,13 +307,23 @@ async def get_random_question(
                     RoundQuestion.round_id == current_round.id
                 ).scalar()
                 
-                # Получаем следующий вопрос (который еще не был показан)
+                # Сначала пытаемся получить последний показанный вопрос (который бот уже показал)
+                # Это нужно для синхронизации с ботом
                 round_question = session.query(RoundQuestion).filter(
                     and_(
                         RoundQuestion.round_id == current_round.id,
-                        RoundQuestion.displayed_at.is_(None)
+                        RoundQuestion.displayed_at.isnot(None)
                     )
-                ).order_by(RoundQuestion.question_number).first()
+                ).order_by(RoundQuestion.displayed_at.desc()).first()
+                
+                # Если нет показанных вопросов, берем первый непоказанный
+                if not round_question:
+                    round_question = session.query(RoundQuestion).filter(
+                        and_(
+                            RoundQuestion.round_id == current_round.id,
+                            RoundQuestion.displayed_at.is_(None)
+                        )
+                    ).order_by(RoundQuestion.question_number).first()
                 
                 if not round_question:
                     raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
@@ -330,29 +343,29 @@ async def get_random_question(
                 if db_question.option_d:
                     options.append({"id": 4, "text": db_question.option_d, "is_correct": db_question.correct_option == 'D'})
                 
-                # Если вопрос был перемешан, применяем перемешивание
+                # Если вопрос был перемешан ботом, показываем варианты в том же порядке
+                # shuffled_options: {original_pos: display_pos} напр. {"A": "C", "B": "A", "C": "B", "D": "D"}
+                # correct_option_shuffled: буква позиции (A/B/C/D) где правильный ответ в отображении бота
                 if round_question.shuffled_options:
                     shuffled = round_question.shuffled_options
-                    # Перемешиваем варианты согласно shuffled_options
+                    # Обратное отображение: для каждой позиции отображения (A,B,C,D) — какой оригинальный вариант
+                    inv = {new_pos: orig for orig, new_pos in shuffled.items()}
                     shuffled_options = []
-                    for orig_opt in ['A', 'B', 'C', 'D']:
-                        if orig_opt in shuffled:
-                            new_pos = shuffled[orig_opt]
-                            # Находим вариант с оригинальной позицией orig_opt
+                    for display_pos in ['A', 'B', 'C', 'D']:
+                        orig_opt = inv.get(display_pos)
+                        if orig_opt:
                             opt_idx = ord(orig_opt) - ord('A')
                             if opt_idx < len(options):
                                 shuffled_options.append({
-                                    "id": opt_idx + 1,
+                                    "id": ord(display_pos) - ord('A') + 1,
                                     "text": options[opt_idx]["text"],
-                                    "is_correct": new_pos == round_question.correct_option_shuffled
+                                    "is_correct": display_pos == round_question.correct_option_shuffled
                                 })
-                    options = shuffled_options
+                    if shuffled_options:
+                        options = shuffled_options
                 
-                # Отмечаем вопрос как показанный
-                from datetime import datetime
-                import pytz
-                round_question.displayed_at = datetime.now(pytz.UTC)
-                session.commit()
+                # НЕ отмечаем вопрос как показанный - это делает только бот!
+                # Веб-интерфейс только читает состояние из БД
                 
                 # Формируем ответ
                 question = Question(
@@ -366,8 +379,8 @@ async def get_random_question(
                 )
                 
                 current_question_num = round_question.question_number
-                print(f"Returning question {current_question_num} from round {current_round.round_number}")
-                return QuestionResponse(question=question)
+                print(f"Returning question {current_question_num} from round {current_round.round_number}, round_question_id={round_question.id}")
+                return QuestionResponse(question=question, round_question_id=round_question.id)
                 
         except HTTPException:
             raise
