@@ -27,11 +27,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        const newTime = prev - 1
-        const newProgress = (newTime / 60) * 100
-        setProgress(newProgress)
-        
-        if (newTime <= 0) {
+        if (prev <= 1) {
           clearInterval(timer)
           // Автоматически переходим к следующему раунду
           setTimeout(() => {
@@ -39,6 +35,9 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
           }, 500)
           return 0
         }
+        const newTime = prev - 1
+        const newProgress = (newTime / 60) * 100
+        setProgress(newProgress)
         return newTime
       })
     }, 1000)
