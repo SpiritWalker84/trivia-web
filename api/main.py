@@ -456,7 +456,15 @@ async def get_random_question(
                     # Дополнительная пауза между вопросами (2.5 сек)
                     active_until = displayed_question.displayed_at + timedelta(seconds=time_limit + 2.5)
                     if now <= active_until:
-                        round_question = displayed_question
+                        # Если пользователь уже ответил на этот вопрос, переходим к следующему
+                        answered = session.query(AnswerModel.id).filter(
+                            and_(
+                                AnswerModel.round_question_id == displayed_question.id,
+                                AnswerModel.user_id == user_id
+                            )
+                        ).first()
+                        if not answered:
+                            round_question = displayed_question
 
                 if not round_question:
                     # Берем первый непоказанный вопрос
