@@ -21,6 +21,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const [error, setError] = useState<string | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
+  const [timeExpired, setTimeExpired] = useState(false) // Флаг, что время истекло без ответа
   const [timerKey, setTimerKey] = useState(0)
   const [roundQuestionId, setRoundQuestionId] = useState<number | null>(null)
   const nextQuestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -83,6 +84,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     setError(null)
     setSelectedAnswer(null)
     setShowResult(false)
+    setTimeExpired(false)
     setTimerKey(prev => prev + 1)
 
     try {
@@ -120,6 +122,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     setError(null)
     setSelectedAnswer(null)
     setShowResult(false)
+    setTimeExpired(false)
     setTimerKey(prev => prev + 1)
 
     try {
@@ -267,11 +270,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     isNextQuestionScheduled.current = true
 
     if (!showResult) {
-      const correctAnswer = question.answers.find(a => a.is_correct)
-      if (correctAnswer) {
-        setSelectedAnswer(correctAnswer.id)
-        setShowResult(true)
-      }
+      // Если пользователь не ответил, показываем правильный ответ с желтым фоном (без галочки)
+      setTimeExpired(true)
+      setShowResult(true)
     }
 
     if (nextQuestionTimeoutRef.current) {
