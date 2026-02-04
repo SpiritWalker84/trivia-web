@@ -8,10 +8,9 @@ interface RoundSummaryProps {
   roundNumber: number
   totalRounds: number
   onNextRound: () => void
-  onLeaveGame?: () => void
 }
 
-const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onLeaveGame }: RoundSummaryProps) => {
+const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: RoundSummaryProps) => {
   const [timeLeft, setTimeLeft] = useState(30)
   const [progress, setProgress] = useState(100)
   
@@ -249,23 +248,6 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
         </motion.div>
       )}
 
-      <motion.div
-        className="round-summary-actions"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-      >
-        {onLeaveGame && (
-          <motion.button
-            className="btn-leave-game"
-            onClick={onLeaveGame}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            🚪 Покинуть игру
-          </motion.button>
-        )}
-      </motion.div>
     </motion.div>
   )
 }
