@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState, useMemo } from 'react'
 import { Participant } from '../types/question'
 import './RoundSummary.css'
 
@@ -11,6 +12,53 @@ interface RoundSummaryProps {
 }
 
 const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onLeaveGame }: RoundSummaryProps) => {
+  const [timeLeft, setTimeLeft] = useState(60)
+  const [progress, setProgress] = useState(100)
+
+  // Автоматический таймер на 60 секунд
+  useEffect(() => {
+    if (totalRounds && roundNumber >= totalRounds) {
+      // Если это последний раунд, не запускаем таймер
+      return
+    }
+
+    setTimeLeft(60)
+    setProgress(100)
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        const newTime = prev - 1
+        const newProgress = (newTime / 60) * 100
+        setProgress(newProgress)
+        
+        if (newTime <= 0) {
+          clearInterval(timer)
+          // Автоматически переходим к следующему раунду
+          setTimeout(() => {
+            onNextRound()
+          }, 500)
+          return 0
+        }
+        return newTime
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [roundNumber, totalRounds, onNextRound])
+
+  // Определяем цвет таймера
+  const timerColor = useMemo(() => {
+    const percentage = (timeLeft / 60) * 100
+    if (percentage > 60) return 'var(--timer-green)'
+    if (percentage > 40) return 'var(--timer-yellow)'
+    if (percentage > 20) return 'var(--timer-orange)'
+    return 'var(--timer-red)'
+  }, [timeLeft])
+
+  const circumference = 2 * Math.PI * 50 // радиус 50
+  const offset = circumference - (progress / 100) * circumference
+
+  const isLastRound = roundNumber >= totalRounds
   const sortedParticipants = [...participants].sort((a, b) => b.correct_answers - a.correct_answers)
   
   // Определяем выбывшего игрока - только один, кто занял последнее место (последний в отсортированном списке)
@@ -32,8 +80,6 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
     if (index === 2) return 'rank-third'
     return ''
   }
-
-  const isLastRound = roundNumber >= totalRounds
 
   return (
     <motion.div
@@ -137,22 +183,68 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
         </div>
       </div>
 
+      {/* Таймер до следующего раунда */}
+      {!isLastRound && (
+        <motion.div
+          className="round-timer-container"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.0 }}
+        >
+          <div className="round-timer-wrapper">
+            <div className="round-timer-label">До следующего раунда</div>
+            <div className="round-timer-circle-wrapper">
+              <svg className="round-timer-svg" width="120" height="120" viewBox="0 0 100 100">
+                {/* Фоновый круг */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  stroke="rgba(183, 190, 221, 0.2)"
+                  strokeWidth="8"
+                />
+                {/* Прогресс круг */}
+                <motion.circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  initial={{ strokeDashoffset: circumference, stroke: timerColor }}
+                  animate={{ 
+                    strokeDashoffset: offset,
+                    stroke: timerColor,
+                    filter: `drop-shadow(0 0 12px ${timerColor})`,
+                  }}
+                  transition={{ duration: 0.3, ease: 'linear' }}
+                />
+              </svg>
+              <div className="round-timer-content">
+                <motion.span
+                  className="round-timer-number"
+                  animate={timeLeft <= 10 ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.3, repeat: timeLeft <= 10 ? Infinity : 0 }}
+                  style={{ color: timerColor }}
+                >
+                  {timeLeft}
+                </motion.span>
+                <span className="round-timer-unit">сек</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <motion.div
         className="round-summary-actions"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.8 }}
       >
-        {!isLastRound && (
-          <motion.button
-            className="btn-next-round"
-            onClick={onNextRound}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Следующий раунд
-          </motion.button>
-        )}
         {onLeaveGame && (
           <motion.button
             className="btn-leave-game"

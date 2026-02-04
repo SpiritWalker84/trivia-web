@@ -200,11 +200,71 @@
   box-shadow: 0 2px 8px rgba(251, 146, 60, 0.3);
 }
 
+/* Таймер до следующего раунда */
+.round-timer-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 3rem 0;
+}
+
+.round-timer-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.round-timer-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.round-timer-circle-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.round-timer-svg {
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.3));
+}
+
+.round-timer-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.round-timer-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 20px currentColor;
+  transition: color 0.3s ease;
+}
+
+.round-timer-unit {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .round-summary-actions {
   display: flex;
   justify-content: center;
   gap: 1rem;
-  margin-top: 3rem;
+  margin-top: 2rem;
   flex-wrap: wrap;
 }
 
@@ -286,10 +346,17 @@
     font-size: 1.25rem;
   }
 
-  .btn-next-round {
-    padding: 1rem 2rem;
+  .round-timer-label {
     font-size: 1.1rem;
-    width: 100%;
+  }
+
+  .round-timer-number {
+    font-size: 2rem;
+  }
+
+  .round-timer-svg {
+    width: 100px;
+    height: 100px;
   }
 }
 
@@ -316,5 +383,18 @@
     width: 40px;
     height: 40px;
     font-size: 1.1rem;
+  }
+
+  .round-timer-label {
+    font-size: 1rem;
+  }
+
+  .round-timer-number {
+    font-size: 1.75rem;
+  }
+
+  .round-timer-svg {
+    width: 90px;
+    height: 90px;
   }
 }
