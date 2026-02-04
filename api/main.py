@@ -1104,6 +1104,62 @@ async def finish_round(request: FinishRoundRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error finishing round: {str(e)}")
 
+@app.post("/api/round/finish-current")
+async def finish_current_round(game_id: int = Query(..., description="ID игры")):
+    """
+    Завершить текущий активный раунд (для standalone frontend)
+    """
+    print(f"=== FINISH CURRENT ROUND CALLED === game_id={game_id}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Получаем текущий активный раунд
+            current_round = session.query(Round).filter(
+                and_(
+                    Round.game_id == game_id,
+                    Round.status == 'in_progress'
+                )
+            ).first()
+            
+            if not current_round:
+                # Пробуем найти последний раунд
+                current_round = session.query(Round).filter(
+                    Round.game_id == game_id
+                ).order_by(Round.round_number.desc()).first()
+                
+                if not current_round:
+                    raise HTTPException(status_code=404, detail="No round found")
+            
+            # Завершаем раунд
+            current_round.status = 'finished'
+            current_round.finished_at = datetime.now(pytz.UTC)
+            
+            # Проверяем, нужно ли завершить игру
+            game = session.query(Game).filter(Game.id == game_id).first()
+            if current_round.round_number >= game.total_rounds:
+                game.status = 'finished'
+                game.finished_at = datetime.now(pytz.UTC)
+            
+            session.flush()
+            session.commit()
+            
+            print(f"Current round finished: round_id={current_round.id}, round_number={current_round.round_number}")
+            return {"success": True, "round_id": current_round.id, "round_number": current_round.round_number}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error finishing current round: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error finishing current round: {str(e)}")
+
 @app.post("/api/question/mark-displayed")
 async def mark_question_displayed(request: MarkQuestionDisplayedRequest):
     """
