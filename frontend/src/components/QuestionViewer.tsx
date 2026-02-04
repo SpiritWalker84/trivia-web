@@ -98,6 +98,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   }
 
   const fetchRandomQuestion = async (retryCount = 0) => {
+    const preserveState = showResult && !!question && !!roundQuestionId
     // Защита от повторных вызовов
     if (isNextQuestionScheduled.current && retryCount === 0) {
       console.warn('⚠️ fetchRandomQuestion: Already scheduled, skipping. isNextQuestionScheduled=true')
@@ -114,12 +115,16 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       nextQuestionTimeoutRef.current = null
     }
 
-    setLoading(true)
-    setError(null)
-    setSelectedAnswer(null)
-    setShowResult(false)
-    setTimeExpired(false)
-    setTimerKey(prev => prev + 1)
+    if (!preserveState) {
+      setLoading(true)
+      setError(null)
+      setSelectedAnswer(null)
+      setShowResult(false)
+      setTimeExpired(false)
+      setTimerKey(prev => prev + 1)
+    } else {
+      setError(null)
+    }
 
     try {
       // Формируем URL с параметрами game_id и user_id
@@ -135,7 +140,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           const errorData = await response.json().catch(() => ({ detail: 'Game is waiting to start' }))
           console.log(`⏳ fetchRandomQuestion: Game is waiting to start (202), retry ${retryCount}`)
           
-          if (retryCount < 5) {
+          if (retryCount < 30) {
             // Повторяем попытку через 1 секунду
             setTimeout(() => {
               fetchRandomQuestion(retryCount + 1)
@@ -155,7 +160,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
           console.log(`✅ fetchRandomQuestion: ${errorDetail} (400), retry ${retryCount}`)
           
           // Если это "No active round found" или "Game is not in progress", пробуем повторить
-          if ((errorDetail.includes('No active round') || errorDetail.includes('not in progress')) && retryCount < 5) {
+          if ((errorDetail.includes('No active round') || errorDetail.includes('not in progress')) && retryCount < 30) {
             console.log(`🔄 fetchRandomQuestion: Retrying in 1 second...`)
             setTimeout(() => {
               fetchRandomQuestion(retryCount + 1)
@@ -198,6 +203,11 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
       if (isSameQuestion) {
         console.log('⏸️ fetchRandomQuestion: Same question returned, keeping current view')
+        if (preserveState && retryCount < 30) {
+          setTimeout(() => {
+            fetchRandomQuestion(retryCount + 1)
+          }, 1000)
+        }
         setLoading(false)
         isNextQuestionScheduled.current = false
         return
