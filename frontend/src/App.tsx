@@ -349,14 +349,10 @@ function App() {
           await fetchLeaderboard(true)
           
           // Проверяем статус игры - если игра остановлена (все человеческие игроки выбыли), не создаем новый раунд
-          const gameStatusResponse = await fetch(`/api/game/status?game_id=${gameId}`)
-          if (gameStatusResponse.ok) {
-            const gameStatus = await gameStatusResponse.json()
-            if (gameStatus.status === 'finished') {
-              console.log('⚠️ Game is finished (all human players eliminated), stopping')
-              alert('Игра завершена: все человеческие игроки выбыли')
-              return
-            }
+          if (finishData.game_status === 'finished') {
+            console.log('⚠️ Game is finished (all human players eliminated), stopping')
+            alert('Игра завершена: все человеческие игроки выбыли')
+            return
           }
         } else {
           console.warn('Failed to finish current round, continuing anyway')
