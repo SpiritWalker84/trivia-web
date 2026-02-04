@@ -33,8 +33,10 @@ function App() {
   const [userId, setUserId] = useState<number | null>(urlUserId)
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null)
   const [isCreatingGame, setIsCreatingGame] = useState(false)
-  // Показываем setup только если нет telegram_id и нет активной игры
-  const [showGameSetup, setShowGameSetup] = useState(!telegramId && (!urlGameId || !urlUserId))
+  // Показываем setup если нет активной игры (gameId/userId из URL)
+  // Если есть telegramId, показываем GameSetup для выбора типа игры
+  // Если нет telegramId и нет gameId/userId, тоже показываем GameSetup
+  const [showGameSetup, setShowGameSetup] = useState(!urlGameId || !urlUserId)
   
   const [questionId, setQuestionId] = useState<number | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -318,6 +320,24 @@ function App() {
           telegramId={telegramId}
           initialPlayerName={userInfo?.full_name}
         />
+      </div>
+    )
+  }
+  
+  // Показываем экран загрузки только если игра создается
+  if (isCreatingGame) {
+    return (
+      <div className="app">
+        <div className="loading-screen">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2>🎮 Загрузка игры...</h2>
+            <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Подождите, игра создается</p>
+          </motion.div>
+        </div>
       </div>
     )
   }
