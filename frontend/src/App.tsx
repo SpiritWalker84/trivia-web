@@ -34,6 +34,11 @@ function App() {
   const [userId, setUserId] = useState<number | null>(urlUserId)
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null)
   const [isCreatingGame, setIsCreatingGame] = useState(false)
+  const [isWaitingRoom, setIsWaitingRoom] = useState(false)
+  const [isHost, setIsHost] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
+  const [roomPlayers, setRoomPlayers] = useState<Participant[]>([])
   // Показываем setup если нет активной игры (gameId/userId из URL)
   // Если есть telegramId, показываем GameSetup для выбора типа игры
   // Если нет telegramId и нет gameId/userId, тоже показываем GameSetup
@@ -105,6 +110,127 @@ function App() {
       alert(`Ошибка при создании игры: ${error instanceof Error ? error.message : 'Unknown error'}`)
       // Оставляем на экране настройки, чтобы пользователь мог попробовать снова
     }
+  }
+
+  const handleCreatePrivate = async (playerName: string) => {
+    console.log('🎮 Creating private game:', playerName)
+    setShowGameSetup(false)
+    setIsCreatingGame(true)
+    try {
+      const response = await fetch('/api/private/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          player_name: playerName,
+          player_telegram_id: telegramId,
+        }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to create private game' }))
+        throw new Error(error.detail || 'Failed to create private game')
+      }
+      const data = await response.json()
+      setGameId(data.game_id)
+      setUserId(data.user_id)
+      setTotalRounds(data.total_rounds)
+      setInviteCode(data.invite_code || '')
+      setInviteLink(data.invite_link || '')
+      setIsHost(true)
+      setIsWaitingRoom(true)
+      setIsCreatingGame(false)
+    } catch (error) {
+      console.error('Error creating private game:', error)
+      setIsCreatingGame(false)
+      setShowGameSetup(true)
+      alert(`Ошибка при создании комнаты: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleJoinPrivate = async (playerName: string, roomCode: string) => {
+    console.log('🎮 Joining private game:', roomCode)
+    setShowGameSetup(false)
+    setIsCreatingGame(true)
+    try {
+      const response = await fetch('/api/private/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          room_code: roomCode,
+          player_name: playerName,
+          player_telegram_id: telegramId,
+        }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to join private game' }))
+        throw new Error(error.detail || 'Failed to join private game')
+      }
+      const data = await response.json()
+      setGameId(data.game_id)
+      setUserId(data.user_id)
+      setTotalRounds(data.total_rounds)
+      setInviteCode(roomCode)
+      setInviteLink('')
+      setIsHost(false)
+      setIsWaitingRoom(true)
+      setIsCreatingGame(false)
+    } catch (error) {
+      console.error('Error joining private game:', error)
+      setIsCreatingGame(false)
+      setShowGameSetup(true)
+      alert(`Ошибка при входе в комнату: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const fetchPrivatePlayers = async () => {
+    if (!gameId) return
+    try {
+      const response = await fetch(`/api/private/players?game_id=${gameId}`)
+      if (!response.ok) return
+      const data = await response.json()
+      setRoomPlayers(data.players || [])
+      setIsHost(data.host_user_id === userId)
+    } catch (error) {
+      console.warn('Failed to fetch private players:', error)
+    }
+  }
+
+  const handleStartPrivateGame = async () => {
+    if (!gameId || !userId) return
+    try {
+      const response = await fetch('/api/private/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: gameId,
+          user_id: userId,
+        }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to start game' }))
+        throw new Error(error.detail || 'Failed to start game')
+      }
+      setIsWaitingRoom(false)
+      await createAndStartRound(gameId, 1)
+    } catch (error) {
+      console.error('Error starting private game:', error)
+      alert(`Ошибка при старте игры: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleExitToMenu = () => {
+    setIsWaitingRoom(false)
+    setShowGameSetup(true)
+    setGameId(null)
+    setUserId(null)
+    setInviteCode('')
+    setInviteLink('')
+    setRoomPlayers([])
   }
   
   // Создать и запустить раунд
@@ -316,6 +442,17 @@ function App() {
     return () => clearInterval(interval)
   }, [showRoundSummary, gameId, userId])
 
+  useEffect(() => {
+    if (!isWaitingRoom || !gameId) {
+      return
+    }
+    fetchPrivatePlayers()
+    const interval = setInterval(() => {
+      fetchPrivatePlayers()
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isWaitingRoom, gameId])
+
   const handleQuestionChange = (id: number | null) => {
     setQuestionId(id)
   }
@@ -369,9 +506,65 @@ function App() {
       <div className="app">
         <GameSetup 
           onStartGame={handleStartGame} 
+          onCreatePrivate={handleCreatePrivate}
+          onJoinPrivate={handleJoinPrivate}
           telegramId={telegramId}
           initialPlayerName={userInfo?.full_name}
         />
+      </div>
+    )
+  }
+
+  if (isWaitingRoom) {
+    return (
+      <div className="app">
+        <div className="waiting-room">
+          <div className="waiting-header">
+            <h2>🕒 Ожидание игроков</h2>
+            <p>Пригласите друзей по ссылке или коду комнаты</p>
+          </div>
+          <div className="waiting-invite">
+            <div className="invite-item">
+              <span className="invite-label">Код комнаты</span>
+              <div className="invite-value">{inviteCode || '—'}</div>
+            </div>
+            {inviteLink && (
+              <div className="invite-item">
+                <span className="invite-label">Ссылка</span>
+                <div className="invite-link">
+                  <input value={inviteLink} readOnly />
+                  <button
+                    className="btn-copy-link"
+                    onClick={() => navigator.clipboard.writeText(inviteLink)}
+                  >
+                    Скопировать
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="waiting-players">
+            <h3>Игроки ({roomPlayers.length})</h3>
+            <ul>
+              {roomPlayers.map((p) => (
+                <li key={p.id}>
+                  {p.name}
+                  {p.id === userId && <span className="you-badge">Вы</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="waiting-actions">
+            {isHost && (
+              <button className="btn-start-game" onClick={handleStartPrivateGame}>
+                🚀 Начать игру
+              </button>
+            )}
+            <button className="btn-return-to-menu" onClick={handleExitToMenu}>
+              Вернуться в меню
+            </button>
+          </div>
+        </div>
       </div>
     )
   }

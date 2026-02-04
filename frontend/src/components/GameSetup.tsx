@@ -4,6 +4,8 @@ import './GameSetup.css'
 
 interface GameSetupProps {
   onStartGame: (settings: GameSettings) => void
+  onCreatePrivate: (playerName: string) => void
+  onJoinPrivate: (playerName: string, roomCode: string) => void
   telegramId?: number | null  // Если пользователь пришел из бота
   initialPlayerName?: string  // Имя из бота (если есть)
 }
@@ -16,12 +18,14 @@ export interface GameSettings {
   botDifficulty?: 'novice' | 'amateur' | 'expert'  // Уровень сложности ботов для training
 }
 
-const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProps) => {
+const GameSetup = ({ onStartGame, onCreatePrivate, onJoinPrivate, telegramId, initialPlayerName }: GameSetupProps) => {
   const [playerName, setPlayerName] = useState(initialPlayerName || '')
   const [gameType, setGameType] = useState<'training' | 'private'>('training')
   const [botDifficulty, setBotDifficulty] = useState<'novice' | 'amateur' | 'expert'>('amateur')
   const [isLoadingName, setIsLoadingName] = useState(!!telegramId && !initialPlayerName)
   const [showRules, setShowRules] = useState(false)
+  const [privateMode, setPrivateMode] = useState<'create' | 'join'>('create')
+  const [roomCode, setRoomCode] = useState('')
 
   // Загружаем имя пользователя, если есть telegram_id
   useEffect(() => {
@@ -62,13 +66,15 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
       alert('Пожалуйста, подождите, загружается информация о пользователе')
       return
     }
-    onStartGame({
-      gameType,
-      totalRounds: 9, // Фиксированное количество раундов
-      themeId: null, // Смешанная тема
-      playerName: playerName.trim(),
-      botDifficulty: gameType === 'training' ? botDifficulty : undefined
-    })
+    if (gameType === 'training') {
+      onStartGame({
+        gameType,
+        totalRounds: 9, // Фиксированное количество раундов
+        themeId: null, // Смешанная тема
+        playerName: playerName.trim(),
+        botDifficulty: botDifficulty
+      })
+    }
   }
 
   return (
@@ -199,6 +205,62 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
           </div>
         )}
 
+        {gameType === 'private' && (
+          <div className="form-group">
+            <label>Комната *</label>
+            <div className="private-mode-tabs">
+              <button
+                type="button"
+                className={`private-tab ${privateMode === 'create' ? 'active' : ''}`}
+                onClick={() => setPrivateMode('create')}
+              >
+                Создать
+              </button>
+              <button
+                type="button"
+                className={`private-tab ${privateMode === 'join' ? 'active' : ''}`}
+                onClick={() => setPrivateMode('join')}
+              >
+                Войти по коду
+              </button>
+            </div>
+            {privateMode === 'join' && (
+              <input
+                type="text"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                placeholder="Введите код комнаты"
+                maxLength={8}
+              />
+            )}
+            <div className="private-actions">
+              <motion.button
+                type="button"
+                className="btn-start-game"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (!playerName.trim()) {
+                    alert('Пожалуйста, подождите, загружается информация о пользователе')
+                    return
+                  }
+                  if (privateMode === 'create') {
+                    onCreatePrivate(playerName.trim())
+                  } else {
+                    if (!roomCode.trim()) {
+                      alert('Введите код комнаты')
+                      return
+                    }
+                    onJoinPrivate(playerName.trim(), roomCode.trim())
+                  }
+                }}
+              >
+                {privateMode === 'create' ? 'Создать комнату' : 'Войти в комнату'}
+              </motion.button>
+            </div>
+          </div>
+        )}
+
         <div className="game-setup-actions">
           <motion.button
             type="button"
@@ -209,14 +271,16 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
           >
             📘 Правила
           </motion.button>
-          <motion.button
-            type="submit"
-            className="btn-start-game"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            🚀 Начать игру
-          </motion.button>
+          {gameType === 'training' && (
+            <motion.button
+              type="submit"
+              className="btn-start-game"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              🚀 Начать игру
+            </motion.button>
+          )}
         </div>
       </form>
     </motion.div>

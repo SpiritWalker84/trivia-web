@@ -19,6 +19,111 @@
   position: relative;
 }
 
+.waiting-room {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 2.5rem;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+}
+
+.waiting-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.waiting-header h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.waiting-header p {
+  color: var(--text-muted);
+}
+
+.waiting-invite {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.invite-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.invite-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.invite-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.invite-link {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.invite-link input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.btn-copy-link {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent-primary);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.waiting-players h3 {
+  margin-bottom: 0.75rem;
+}
+
+.waiting-players ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.waiting-players li {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(183, 190, 221, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waiting-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.waiting-actions .btn-start-game,
+.waiting-actions .btn-return-to-menu {
+  margin-top: 0;
+}
+
 /* Верхняя панель: логотип, раунд, таймер */
 .app-header {
   display: flex;
@@ -202,6 +307,14 @@
 
   .app-content {
     gap: 1.5rem;
+  }
+
+  .waiting-room {
+    padding: 1.75rem;
+  }
+
+  .invite-link {
+    flex-direction: column;
   }
 }
 

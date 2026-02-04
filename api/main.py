@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, func, and_, select
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
+import string
 
 # Импорт моделей БД из shared
 try:
@@ -48,6 +49,33 @@ except ImportError as e:
 load_dotenv()
 
 app = FastAPI(title="Trivia Web API", version="0.1.0")
+
+# URL фронтенда для генерации ссылок приглашения
+FRONTEND_URL = os.getenv("WEB_URL") or os.getenv("FRONTEND_URL") or ""
+
+# Helpers for room codes (base36)
+_BASE36_ALPHABET = string.digits + string.ascii_uppercase
+
+def encode_room_code(game_id: int) -> str:
+    """Encode numeric game_id to a short base36 room code."""
+    if game_id <= 0:
+        return "0"
+    n = game_id
+    chars = []
+    while n > 0:
+        n, r = divmod(n, 36)
+        chars.append(_BASE36_ALPHABET[r])
+    return "".join(reversed(chars))
+
+def decode_room_code(code: str) -> Optional[int]:
+    """Decode base36 room code to numeric game_id."""
+    if not code:
+        return None
+    code = code.strip().upper()
+    try:
+        return int(code, 36)
+    except ValueError:
+        return None
 
 # Telegram ID администратора (можно переопределить через переменную окружения)
 ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "320889576"))
@@ -817,6 +845,36 @@ class FinishRoundRequest(BaseModel):
 class MarkQuestionDisplayedRequest(BaseModel):
     round_question_id: int
 
+class CreatePrivateGameRequest(BaseModel):
+    player_name: str
+    player_telegram_id: Optional[int] = None
+
+class CreatePrivateGameResponse(BaseModel):
+    game_id: int
+    user_id: int
+    total_rounds: int
+    invite_code: str
+    invite_link: str
+
+class JoinPrivateGameRequest(BaseModel):
+    room_code: str
+    player_name: str
+    player_telegram_id: Optional[int] = None
+
+class JoinPrivateGameResponse(BaseModel):
+    game_id: int
+    user_id: int
+    total_rounds: int
+
+class PrivatePlayersResponse(BaseModel):
+    game_id: int
+    players: List[Participant]
+    host_user_id: Optional[int] = None
+
+class StartPrivateGameRequest(BaseModel):
+    game_id: int
+    user_id: int
+
 @app.post("/api/game/create", response_model=CreateGameResponse)
 async def create_game(request: CreateGameRequest):
     """
@@ -937,6 +995,241 @@ async def create_game(request: CreateGameRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error creating game: {str(e)}")
+
+@app.post("/api/private/create", response_model=CreatePrivateGameResponse)
+async def create_private_game(request: CreatePrivateGameRequest):
+    """
+    Создать приватную игру и вернуть код комнаты
+    """
+    print(f"=== CREATE PRIVATE GAME CALLED === player_name={request.player_name}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Создаем или получаем пользователя
+            user = None
+            if request.player_telegram_id:
+                user = session.query(User).filter(User.telegram_id == request.player_telegram_id).first()
+            
+            if not user:
+                user = User(
+                    telegram_id=request.player_telegram_id,
+                    username=request.player_name,
+                    full_name=request.player_name,
+                    is_bot=False
+                )
+                session.add(user)
+                session.flush()
+                print(f"Created new user: id={user.id}, name={request.player_name}")
+            else:
+                print(f"Using existing user: id={user.id}, name={user.full_name}")
+            
+            # Создаем приватную игру
+            game = Game(
+                game_type='private',
+                creator_id=user.id,
+                theme_id=None,
+                status='waiting',
+                total_rounds=9,
+                current_round=0
+            )
+            session.add(game)
+            session.flush()
+            
+            # Добавляем создателя как игрока
+            game_player = GamePlayer(
+                game_id=game.id,
+                user_id=user.id,
+                is_bot=False,
+                join_order=1,
+                total_score=0
+            )
+            session.add(game_player)
+            session.commit()
+            
+            invite_code = encode_room_code(int(game.id))
+            invite_link = f"{FRONTEND_URL}/?room={invite_code}" if FRONTEND_URL else invite_code
+            
+            print(f"Private game created: id={game.id}, invite_code={invite_code}")
+            return CreatePrivateGameResponse(
+                game_id=game.id,
+                user_id=user.id,
+                total_rounds=game.total_rounds,
+                invite_code=invite_code,
+                invite_link=invite_link
+            )
+            
+    except Exception as e:
+        print(f"Error creating private game: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error creating private game: {str(e)}")
+
+@app.post("/api/private/join", response_model=JoinPrivateGameResponse)
+async def join_private_game(request: JoinPrivateGameRequest):
+    """
+    Войти в приватную игру по коду комнаты
+    """
+    print(f"=== JOIN PRIVATE GAME CALLED === room_code={request.room_code}, player_name={request.player_name}")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    game_id = decode_room_code(request.room_code)
+    if not game_id:
+        raise HTTPException(status_code=400, detail="Invalid room code")
+    
+    try:
+        with get_db_session() as session:
+            game = session.query(Game).filter(Game.id == game_id).first()
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            if game.status not in ['waiting', 'pre_start']:
+                raise HTTPException(status_code=400, detail="Game is already started or finished")
+            
+            # Создаем или получаем пользователя
+            user = None
+            if request.player_telegram_id:
+                user = session.query(User).filter(User.telegram_id == request.player_telegram_id).first()
+            
+            if not user:
+                user = User(
+                    telegram_id=request.player_telegram_id,
+                    username=request.player_name,
+                    full_name=request.player_name,
+                    is_bot=False
+                )
+                session.add(user)
+                session.flush()
+                print(f"Created new user: id={user.id}, name={request.player_name}")
+            
+            # Проверяем, нет ли уже игрока в игре
+            existing_player = session.query(GamePlayer).filter(
+                and_(GamePlayer.game_id == game_id, GamePlayer.user_id == user.id)
+            ).first()
+            
+            if not existing_player:
+                # Определяем порядок входа
+                max_join_order = session.query(func.max(GamePlayer.join_order)).filter(
+                    GamePlayer.game_id == game_id
+                ).scalar() or 0
+                
+                new_player = GamePlayer(
+                    game_id=game_id,
+                    user_id=user.id,
+                    is_bot=False,
+                    join_order=max_join_order + 1,
+                    total_score=0
+                )
+                session.add(new_player)
+                session.commit()
+                print(f"Player {user.id} joined private game {game_id}")
+            
+            return JoinPrivateGameResponse(
+                game_id=game.id,
+                user_id=user.id,
+                total_rounds=game.total_rounds
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error joining private game: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error joining private game: {str(e)}")
+
+@app.get("/api/private/players", response_model=PrivatePlayersResponse)
+async def get_private_players(game_id: Optional[int] = Query(None, description="ID игры")):
+    """
+    Получить список игроков в приватной игре
+    """
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    if not game_id:
+        raise HTTPException(status_code=400, detail="game_id is required")
+    
+    try:
+        with get_db_session() as session:
+            game = session.query(Game).filter(Game.id == game_id).first()
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            players = session.query(GamePlayer).join(User).filter(
+                and_(GamePlayer.game_id == game_id, GamePlayer.left_game == False)
+            ).order_by(GamePlayer.join_order.asc()).all()
+            
+            participants = []
+            for gp in players:
+                if not gp.user:
+                    continue
+                participants.append(Participant(
+                    id=gp.user.id,
+                    name=gp.user.full_name or gp.user.username or f"User {gp.user.id}",
+                    correct_answers=0,
+                    avatar=None,
+                    is_current_user=False,
+                    is_eliminated=False,
+                    total_time=0.0
+                ))
+            
+            return PrivatePlayersResponse(
+                game_id=game.id,
+                players=participants,
+                host_user_id=game.creator_id
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting private players: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting private players: {str(e)}")
+
+@app.post("/api/private/start")
+async def start_private_game(request: StartPrivateGameRequest):
+    """
+    Старт приватной игры (только хост)
+    """
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            game = session.query(Game).filter(Game.id == request.game_id).first()
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            if game.creator_id != request.user_id:
+                raise HTTPException(status_code=403, detail="Only host can start the game")
+            
+            if game.status not in ['waiting', 'pre_start']:
+                raise HTTPException(status_code=400, detail="Game already started or finished")
+            
+            game.status = 'pre_start'
+            game.started_at = game.started_at or datetime.now(pytz.UTC)
+            session.commit()
+            
+            return {"success": True, "game_id": game.id}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error starting private game: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error starting private game: {str(e)}")
 
 @app.post("/api/round/create", response_model=CreateRoundResponse)
 async def create_round(request: CreateRoundRequest):

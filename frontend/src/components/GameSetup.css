@@ -45,6 +45,33 @@
   align-items: center;
 }
 
+.private-mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.private-tab {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  background: var(--bg-card);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.private-tab.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.private-actions {
+  margin-top: 0.75rem;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
