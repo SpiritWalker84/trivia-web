@@ -17,9 +17,11 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
     const validParticipants = participants.filter(p => p && p.id && p.name)
     // Сортируем: сначала активные (по убыванию очков), потом выбывшие (по убыванию очков)
     const sorted = [...validParticipants].sort((a, b) => {
-      // Сначала активные, потом выбывшие
-      if (a.is_eliminated !== b.is_eliminated) {
-        return a.is_eliminated ? 1 : -1
+      // Сначала активные, потом выбывшие (явно проверяем на true)
+      const aEliminated = a.is_eliminated === true
+      const bEliminated = b.is_eliminated === true
+      if (aEliminated !== bEliminated) {
+        return aEliminated ? 1 : -1
       }
       // Внутри группы сортируем по очкам
       return b.correct_answers - a.correct_answers
@@ -65,7 +67,7 @@ const Leaderboard = ({ participants }: LeaderboardProps) => {
           </div>
         ) : (
           sortedParticipants.map((participant, index) => {
-            const isEliminated = participant.is_eliminated
+            const isEliminated = participant.is_eliminated === true // Явно проверяем на true
             // Для выбывших игроков не показываем ранг, а показываем иконку
             const activeIndex = sortedParticipants.filter(p => !p.is_eliminated).indexOf(participant)
             const rankIndex = isEliminated ? -1 : activeIndex

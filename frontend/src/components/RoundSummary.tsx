@@ -64,17 +64,19 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
   const isLastRound = roundNumber >= totalRounds
   // Сортируем: сначала активные (по убыванию очков), потом выбывшие
   const sortedParticipants = [...validParticipants].sort((a, b) => {
-    // Сначала активные, потом выбывшие
-    if (a.is_eliminated !== b.is_eliminated) {
-      return a.is_eliminated ? 1 : -1
+    // Сначала активные, потом выбывшие (явно проверяем на true)
+    const aEliminated = a.is_eliminated === true
+    const bEliminated = b.is_eliminated === true
+    if (aEliminated !== bEliminated) {
+      return aEliminated ? 1 : -1
     }
     // Внутри группы сортируем по очкам
     return b.correct_answers - a.correct_answers
   })
   
-  // Разделяем на активных и выбывших
-  const activeParticipants = sortedParticipants.filter(p => !p.is_eliminated)
-  const eliminatedParticipants = sortedParticipants.filter(p => p.is_eliminated)
+  // Разделяем на активных и выбывших (явно проверяем на true)
+  const activeParticipants = sortedParticipants.filter(p => p.is_eliminated !== true)
+  const eliminatedParticipants = sortedParticipants.filter(p => p.is_eliminated === true)
   
   // Логирование для отладки
   console.log('RoundSummary: Participants:', {
