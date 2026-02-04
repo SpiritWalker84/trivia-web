@@ -77,15 +77,17 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
   }
 
-  const fetchRandomQuestion = async () => {
+  const fetchRandomQuestion = async (retryCount = 0) => {
     // Защита от повторных вызовов
-    if (isNextQuestionScheduled.current) {
+    if (isNextQuestionScheduled.current && retryCount === 0) {
       console.warn('⚠️ fetchRandomQuestion: Already scheduled, skipping. isNextQuestionScheduled=true')
       return
     }
     
-    console.log('🚀 fetchRandomQuestion: STARTING. isNextQuestionScheduled was false, setting to true')
-    isNextQuestionScheduled.current = true
+    console.log(`🚀 fetchRandomQuestion: STARTING (retry ${retryCount}). isNextQuestionScheduled was false, setting to true`)
+    if (retryCount === 0) {
+      isNextQuestionScheduled.current = true
+    }
 
     if (nextQuestionTimeoutRef.current) {
       clearTimeout(nextQuestionTimeoutRef.current)
@@ -108,17 +110,39 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       const response = await fetch(url.toString())
       if (!response.ok) {
         if (response.status === 202) {
-          // Игра ожидает начала
+          // Игра ожидает начала - пробуем повторить через некоторое время
           const errorData = await response.json().catch(() => ({ detail: 'Game is waiting to start' }))
-          console.log('⏳ fetchRandomQuestion: Game is waiting to start (202)')
-          setError(errorData.detail || 'Игра ожидает начала')
-          setLoading(false)
-          isNextQuestionScheduled.current = false
-          return
+          console.log(`⏳ fetchRandomQuestion: Game is waiting to start (202), retry ${retryCount}`)
+          
+          if (retryCount < 5) {
+            // Повторяем попытку через 1 секунду
+            setTimeout(() => {
+              fetchRandomQuestion(retryCount + 1)
+            }, 1000)
+            return
+          } else {
+            setError(errorData.detail || 'Игра ожидает начала. Пожалуйста, подождите...')
+            setLoading(false)
+            isNextQuestionScheduled.current = false
+            return
+          }
         }
         if (response.status === 400) {
-          // Раунд завершен, вызываем callback для показа summary
-          console.log('✅ fetchRandomQuestion: Round completed (400)')
+          // Получаем детали ошибки
+          const errorData = await response.json().catch(() => ({ detail: 'Round completed' }))
+          const errorDetail = errorData.detail || 'Round completed'
+          console.log(`✅ fetchRandomQuestion: ${errorDetail} (400), retry ${retryCount}`)
+          
+          // Если это "No active round found" или "Game is not in progress", пробуем повторить
+          if ((errorDetail.includes('No active round') || errorDetail.includes('not in progress')) && retryCount < 5) {
+            console.log(`🔄 fetchRandomQuestion: Retrying in 1 second...`)
+            setTimeout(() => {
+              fetchRandomQuestion(retryCount + 1)
+            }, 1000)
+            return
+          }
+          
+          // Иначе раунд действительно завершен
           setError(null)
           setLoading(false)
           isNextQuestionScheduled.current = false
@@ -131,6 +155,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       
       // Проверяем, что данные корректны
       if (!data || !data.question) {
+        console.warn('⚠️ fetchRandomQuestion: Invalid response, retrying...', data)
+        if (retryCount < 5) {
+          setTimeout(() => {
+            fetchRandomQuestion(retryCount + 1)
+          }, 1000)
+          return
+        }
         throw new Error('Invalid response from server: question is missing')
       }
       

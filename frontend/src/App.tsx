@@ -141,13 +141,13 @@ function App() {
       setRoundCompleted(false)
       setQuestionId(null)
       
-      // Небольшая задержка перед загрузкой лидерборда и вопроса
-      // чтобы убедиться, что раунд полностью создан в БД
+      // Увеличиваем задержку перед загрузкой лидерборда и вопроса
+      // чтобы убедиться, что раунд полностью создан и запущен в БД
       setTimeout(() => {
         fetchLeaderboard(true)
         // Сбрасываем questionId, чтобы QuestionViewer загрузил новый вопрос
         setQuestionId(null)
-      }, 500)
+      }, 1500) // Увеличено с 500 до 1500 мс
       
     } catch (error) {
       console.error('Error creating/starting round:', error)

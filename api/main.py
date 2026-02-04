@@ -878,7 +878,11 @@ async def create_round(request: CreateRoundRequest):
                 # Отмечаем вопрос как использованный в игре
                 # TODO: Если есть модель GameUsedQuestion, добавить запись
             
+            # Убеждаемся, что все изменения сохранены перед commit
+            session.flush()
             session.commit()
+            
+            print(f"Round created and committed: id={round_obj.id}, questions_count={len(available_questions)}")
             
             print(f"Round created: id={round_obj.id}, questions_count={len(available_questions)}")
             return CreateRoundResponse(
@@ -923,14 +927,18 @@ async def start_round(request: StartRoundRequest):
                 raise HTTPException(status_code=400, detail="Round does not belong to this game")
             
             # Обновляем статус игры и раунда
-            if game.status == 'waiting':
+            if game.status == 'waiting' or game.status == 'pre_start':
                 game.status = 'in_progress'
-                game.started_at = datetime.now(pytz.UTC)
+                if not game.started_at:
+                    game.started_at = datetime.now(pytz.UTC)
             
             game.current_round = round_obj.round_number
             round_obj.status = 'in_progress'
-            round_obj.started_at = datetime.now(pytz.UTC)
+            if not round_obj.started_at:
+                round_obj.started_at = datetime.now(pytz.UTC)
             
+            # Убеждаемся, что все изменения сохранены перед commit
+            session.flush()
             session.commit()
             
             print(f"Round started: round_id={request.round_id}")
