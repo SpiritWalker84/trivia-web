@@ -12,20 +12,20 @@ interface RoundSummaryProps {
 }
 
 const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onLeaveGame }: RoundSummaryProps) => {
-  const [timeLeft, setTimeLeft] = useState(60)
+  const [timeLeft, setTimeLeft] = useState(30)
   const [progress, setProgress] = useState(100)
   
   // Фильтруем участников, у которых есть id
   const validParticipants = participants.filter(p => p && p.id)
 
-  // Автоматический таймер на 60 секунд
+  // Автоматический таймер на 30 секунд
   useEffect(() => {
     if (totalRounds && roundNumber >= totalRounds) {
       // Если это последний раунд, не запускаем таймер
       return
     }
 
-    setTimeLeft(60)
+    setTimeLeft(30)
     setProgress(100)
 
     const timer = setInterval(() => {
@@ -39,7 +39,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
           return 0
         }
         const newTime = prev - 1
-        const newProgress = (newTime / 60) * 100
+        const newProgress = (newTime / 30) * 100
         setProgress(newProgress)
         return newTime
       })
@@ -50,7 +50,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
 
   // Определяем цвет таймера
   const timerColor = useMemo(() => {
-    const percentage = (timeLeft / 60) * 100
+    const percentage = (timeLeft / 30) * 100
     if (percentage > 60) return 'var(--timer-green)'
     if (percentage > 40) return 'var(--timer-yellow)'
     if (percentage > 20) return 'var(--timer-orange)'
@@ -59,6 +59,8 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, onL
 
   const circumference = 2 * Math.PI * 50 // радиус 50
   const offset = circumference - (progress / 100) * circumference
+  
+  // Обновляем таймер для 30 секунд вместо 60
 
   const isLastRound = roundNumber >= totalRounds
   // Сортируем: сначала активные (по убыванию очков), потом выбывшие

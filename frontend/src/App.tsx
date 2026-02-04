@@ -4,7 +4,8 @@ import QuestionViewer from './components/QuestionViewer'
 import Leaderboard from './components/Leaderboard'
 import RoundSummary from './components/RoundSummary'
 import GameSetup, { GameSettings } from './components/GameSetup'
-import { Participant } from './types/question'
+import Timer from './components/Timer'
+import { Participant, Question } from './types/question'
 import './App.css'
 
 // Получаем параметры из URL (telegram_id от бота, или game_id/user_id для обратной совместимости)
@@ -39,6 +40,7 @@ function App() {
   const [showGameSetup, setShowGameSetup] = useState(!urlGameId || !urlUserId)
   
   const [questionId, setQuestionId] = useState<number | null>(null)
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null) // Текущий вопрос для таймера
   const [participants, setParticipants] = useState<Participant[]>([])
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [totalQuestions, setTotalQuestions] = useState(10)
@@ -405,29 +407,27 @@ function App() {
           >
             Brain Survivor
           </motion.div>
-          <motion.button
-            className="leave-game-btn"
-            onClick={handleLeaveGame}
+          <motion.div
+            className="round-info"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
           >
-            🚪 Покинуть игру
-          </motion.button>
+            Раунд {roundNumber} • Вопрос {currentQuestionNumber} из {totalQuestions}
+          </motion.div>
+          <div className="header-timer">
+            <QuestionTimer questionId={questionId} gameId={gameId} userId={userId} />
+          </div>
         </div>
-        <motion.div
-          className="round-info"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-        >
-          Раунд {roundNumber} • Вопрос {currentQuestionNumber} из {totalQuestions}
-        </motion.div>
-        <div className="timer-placeholder"></div>
       </header>
       <div className="app-content">
+        <aside className="app-sidebar">
+          <Leaderboard
+            participants={participants}
+            currentQuestionNumber={currentQuestionNumber}
+            totalQuestions={totalQuestions}
+          />
+        </aside>
         <main className="app-main">
           <QuestionViewer 
             questionId={questionId} 
@@ -440,25 +440,20 @@ function App() {
               setRoundCompleted(true)
               // Явно показываем summary
               setShowRoundSummary(true)
-              // Сбрасываем questionId, чтобы QuestionViewer не пытался загрузить вопрос
+              // Сбрасываем questionId и вопрос, чтобы QuestionViewer не пытался загрузить вопрос
               setQuestionId(null)
+              setCurrentQuestion(null)
               // Обновляем лидерборд для получения актуальных данных
               fetchLeaderboard(true)
             }}
-            onQuestionLoaded={() => {
+            onQuestionLoaded={(question) => {
               console.log('📊 App: onQuestionLoaded called, fetching leaderboard with counter update')
+              setCurrentQuestion(question)
               fetchLeaderboard(true)
             }} // Обновляем счетчик только после загрузки вопроса
             showRoundSummary={showRoundSummary} // Передаем флаг, чтобы не загружать вопросы во время summary
           />
         </main>
-        <aside className="app-sidebar">
-          <Leaderboard
-            participants={participants}
-            currentQuestionNumber={currentQuestionNumber}
-            totalQuestions={totalQuestions}
-          />
-        </aside>
       </div>
     </div>
   )

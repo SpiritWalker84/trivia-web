@@ -10,7 +10,7 @@ interface QuestionViewerProps {
   userId: number | null
   onQuestionChange: (id: number | null) => void
   onRoundComplete?: () => void
-  onQuestionLoaded?: () => void // Callback когда вопрос успешно загружен
+  onQuestionLoaded?: (question: Question) => void // Callback когда вопрос успешно загружен
   showRoundSummary?: boolean // Флаг, что показывается summary раунда
 }
 
@@ -199,7 +199,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       // Уведомляем о загрузке вопроса - это обновит счетчик в App
       // Вызываем СРАЗУ после установки вопроса
       console.log('📊 fetchRandomQuestion: Calling onQuestionLoaded to update counter')
-      onQuestionLoaded?.()
+      onQuestionLoaded?.(data.question)
       
       // Вызываем onQuestionChange ПОСЛЕ обновления счетчика, чтобы избежать повторной загрузки
       if (data.question && data.question.id) {
@@ -334,16 +334,6 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
   return (
     <div className="question-viewer">
-      {question && !loading && (
-        <div className="question-timer">
-          <Timer
-            key={timerKey}
-            initialTime={timeLimit}
-            onTimeUp={handleTimeUp}
-            isActive={!loading}
-          />
-        </div>
-      )}
       {loading && (
         <motion.div
           className="loading"
