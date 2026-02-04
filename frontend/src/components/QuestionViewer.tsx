@@ -435,8 +435,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
               {question.answers.map((answer: Answer, index: number) => {
                 const isSelected = selectedAnswer === answer.id
                 const isCorrect = answer.is_correct
-                const showCorrect = showResult && isCorrect
-                const showIncorrect = showResult && isSelected && !isCorrect
+                const showCorrect = showResult && isCorrect && !timeExpired // Правильный ответ с галочкой (когда пользователь ответил)
+                const showIncorrect = showResult && isSelected && !isCorrect // Неправильный ответ с крестиком
+                const showTimeExpired = showResult && timeExpired && isCorrect // Правильный ответ с желтым фоном (когда время истекло)
 
                 return (
                   <motion.button
@@ -445,6 +446,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
                       showCorrect ? 'correct' : ''
                     } ${
                       showIncorrect ? 'incorrect' : ''
+                    } ${
+                      showTimeExpired ? 'time-expired' : ''
                     } ${
                       isSelected ? 'selected' : ''
                     }`}
