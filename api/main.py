@@ -957,6 +957,9 @@ async def create_round(request: CreateRoundRequest):
             if not game:
                 raise HTTPException(status_code=404, detail="Game not found")
             
+            if game.status == 'finished':
+                raise HTTPException(status_code=400, detail="Game is finished")
+            
             # Проверяем, что раунд с таким номером еще не создан
             existing_round = session.query(Round).filter(
                 and_(
@@ -1052,6 +1055,9 @@ async def start_round(request: StartRoundRequest):
             game = session.query(Game).filter(Game.id == request.game_id).first()
             if not game:
                 raise HTTPException(status_code=404, detail="Game not found")
+            
+            if game.status == 'finished':
+                raise HTTPException(status_code=400, detail="Game is finished")
             
             # Проверяем раунд
             round_obj = session.query(Round).filter(Round.id == request.round_id).first()
@@ -1179,6 +1185,7 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 )
             ).all()
             
+            all_humans_eliminated = False
             if len(active_players) > 1:  # Выбываем только если осталось больше 1 игрока
                 # Считаем правильные ответы и общее время для каждого игрока в этом раунде
                 player_scores = []
@@ -1235,28 +1242,27 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 session.refresh(eliminated_player)
                 print(f"DEBUG: After flush, GamePlayer {eliminated_player.id} is_eliminated={eliminated_player.is_eliminated}")
                 
-                # Проверяем, остались ли живые человеческие игроки (не боты)
-                remaining_active_players = session.query(GamePlayer).join(User).filter(
-                    and_(
-                        GamePlayer.game_id == game_id,
-                        GamePlayer.is_eliminated == False,
-                        GamePlayer.left_game == False,
-                        User.is_bot == False  # Только человеческие игроки
-                    )
-                ).all()
-                
-                # Если не осталось живых человеческих игроков, останавливаем игру
-                if len(remaining_active_players) == 0:
-                    game = session.query(Game).filter(Game.id == game_id).first()
-                    if game and game.status != 'finished':
-                        game.status = 'finished'
-                        game.finished_at = datetime.now(pytz.UTC)
-                        print(f"Game {game_id} stopped: all human players eliminated, only bots remain")
-                        session.add(game)
-                        session.flush()
-            
-            # Проверяем, нужно ли завершить игру (по количеству раундов)
+            # Проверяем, остались ли живые человеческие игроки (не боты)
+            remaining_active_humans = session.query(GamePlayer).join(User).filter(
+                and_(
+                    GamePlayer.game_id == game_id,
+                    GamePlayer.is_eliminated == False,
+                    GamePlayer.left_game == False,
+                    User.is_bot == False  # Только человеческие игроки
+                )
+            ).all()
+            all_humans_eliminated = len(remaining_active_humans) == 0
+
+            # Проверяем, нужно ли завершить игру (по количеству раундов или если не осталось живых игроков)
             game = session.query(Game).filter(Game.id == game_id).first()
+            if all_humans_eliminated and game and game.status != 'finished':
+                game.status = 'finished'
+                game.finished_at = datetime.now(pytz.UTC)
+                print(f"Game {game_id} stopped: all human players eliminated, only bots remain")
+                session.add(game)
+                session.flush()
+
+            # Проверяем, нужно ли завершить игру (по количеству раундов)
             if game and current_round.round_number >= game.total_rounds:
                 game.status = 'finished'
                 game.finished_at = datetime.now(pytz.UTC)
@@ -1274,8 +1280,14 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                     else:
                         print(f"DEBUG: Could not find GamePlayer {eliminated_player.id} in new session")
             
-            print(f"Current round finished: round_id={current_round.id}, round_number={current_round.round_number}")
-            return {"success": True, "round_id": current_round.id, "round_number": current_round.round_number}
+            print(f"Current round finished: round_id={current_round.id}, round_number={current_round.round_number}, game_status={game.status if game else 'N/A'}, all_humans_eliminated={all_humans_eliminated}")
+            return {
+                "success": True,
+                "round_id": current_round.id,
+                "round_number": current_round.round_number,
+                "game_status": game.status if game else None,
+                "all_humans_eliminated": all_humans_eliminated
+            }
             
     except HTTPException:
         raise
