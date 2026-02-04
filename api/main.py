@@ -1217,6 +1217,44 @@ async def start_private_game(request: StartPrivateGameRequest):
             if game.status not in ['waiting', 'pre_start']:
                 raise HTTPException(status_code=400, detail="Game already started or finished")
             
+            # Автодобавление ботов до 10 игроков
+            current_players = session.query(GamePlayer).filter(
+                GamePlayer.game_id == request.game_id
+            ).count()
+            bots_needed = max(0, 10 - current_players)
+            if bots_needed > 0:
+                bot_difficulty = game.bot_difficulty or 'amateur'
+                max_join_order = session.query(func.max(GamePlayer.join_order)).filter(
+                    GamePlayer.game_id == request.game_id
+                ).scalar() or 0
+                for idx in range(1, bots_needed + 1):
+                    bot_name = f"PrivateBot_{idx}"
+                    bot_user = session.query(User).filter(
+                        User.is_bot == True,
+                        User.username == bot_name,
+                        User.bot_difficulty == bot_difficulty
+                    ).first()
+                    if not bot_user:
+                        bot_user = User(
+                            telegram_id=None,
+                            username=bot_name,
+                            full_name=bot_name,
+                            is_bot=True,
+                            bot_difficulty=bot_difficulty
+                        )
+                        session.add(bot_user)
+                        session.flush()
+                    bot_game_player = GamePlayer(
+                        game_id=game.id,
+                        user_id=bot_user.id,
+                        is_bot=True,
+                        bot_difficulty=bot_difficulty,
+                        join_order=max_join_order + idx,
+                        total_score=0
+                    )
+                    session.add(bot_game_player)
+                print(f"Added {bots_needed} bots to private game {game.id} before старт")
+
             game.status = 'pre_start'
             game.started_at = game.started_at or datetime.now(pytz.UTC)
             session.commit()

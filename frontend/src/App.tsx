@@ -196,6 +196,22 @@ function App() {
       const data = await response.json()
       setRoomPlayers(data.players || [])
       setIsHost(data.host_user_id === userId)
+
+      const statusResponse = await fetch(`/api/game/status?game_id=${gameId}`)
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        if (statusData.status === 'in_progress') {
+          setIsWaitingRoom(false)
+          setShowRoundSummary(false)
+          setQuestionId(null)
+          setCurrentQuestion(null)
+          setCurrentQuestionNumber(1)
+        }
+        if (statusData.status === 'finished') {
+          setIsWaitingRoom(false)
+          setShowGameSetup(true)
+        }
+      }
     } catch (error) {
       console.warn('Failed to fetch private players:', error)
     }
