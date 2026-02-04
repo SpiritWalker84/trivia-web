@@ -295,6 +295,11 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       // Если пользователь не ответил, показываем правильный ответ с желтым фоном (без галочки)
       setTimeExpired(true)
       setShowResult(true)
+      // Отправляем «таймаут» на сервер, чтобы API считал игрока ответившим и вернул 400 (Round completed) при следующем запросе
+      const wrongAnswer = question.answers.find((a: Answer) => !a.is_correct)
+      if (wrongAnswer && gameId && userId && roundQuestionId) {
+        sendAnswer(question.id, wrongAnswer.id, false)
+      }
     }
 
     if (nextQuestionTimeoutRef.current) {
@@ -315,7 +320,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       isNextQuestionScheduled.current = false
       fetchRandomQuestion()
     }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
-  }, [question, showResult, showRoundSummary])
+  }, [question, showResult, showRoundSummary, roundQuestionId, gameId, userId])
 
   // Передаем handleTimeUp в родительский компонент через callback
   useEffect(() => {
