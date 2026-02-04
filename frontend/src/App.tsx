@@ -3,10 +3,11 @@ import { motion } from 'framer-motion'
 import QuestionViewer from './components/QuestionViewer'
 import Leaderboard from './components/Leaderboard'
 import RoundSummary from './components/RoundSummary'
+import GameSetup, { GameSettings } from './components/GameSetup'
 import { Participant } from './types/question'
 import './App.css'
 
-// Получаем game_id и user_id из URL параметров
+// Получаем game_id и user_id из URL параметров (для обратной совместимости с ботом)
 function getUrlParams(): { gameId: number | null; userId: number | null } {
   const params = new URLSearchParams(window.location.search)
   const gameId = params.get('game_id')
@@ -18,8 +19,14 @@ function getUrlParams(): { gameId: number | null; userId: number | null } {
 }
 
 function App() {
-  // Получаем game_id и user_id из URL при загрузке
-  const { gameId, userId } = getUrlParams()
+  // Получаем game_id и user_id из URL при загрузке (для обратной совместимости)
+  const { gameId: urlGameId, userId: urlUserId } = getUrlParams()
+  
+  // Состояние игры
+  const [gameId, setGameId] = useState<number | null>(urlGameId)
+  const [userId, setUserId] = useState<number | null>(urlUserId)
+  const [gameSettings, setGameSettings] = useState<GameSettings | null>(null)
+  const [showGameSetup, setShowGameSetup] = useState(!urlGameId || !urlUserId)
   
   const [questionId, setQuestionId] = useState<number | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -27,14 +34,110 @@ function App() {
   const [totalQuestions, setTotalQuestions] = useState(10)
   const [showRoundSummary, setShowRoundSummary] = useState(false)
   const [roundNumber, setRoundNumber] = useState(1)
-  const [totalRounds] = useState(9)
+  const [totalRounds, setTotalRounds] = useState(9)
   const [roundCompleted, setRoundCompleted] = useState(false) // Флаг завершения раунда
+  
+  // Обработчик старта игры
+  const handleStartGame = async (settings: GameSettings) => {
+    console.log('🎮 Starting game with settings:', settings)
+    setGameSettings(settings)
+    
+    try {
+      // Создаем игру через API
+      const response = await fetch('/api/game/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_type: settings.gameType,
+          theme_id: settings.themeId,
+          total_rounds: settings.totalRounds,
+          player_name: settings.playerName,
+          player_telegram_id: null, // Для standalone frontend
+        }),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to create game' }))
+        throw new Error(error.detail || 'Failed to create game')
+      }
+      
+      const data = await response.json()
+      console.log('✅ Game created:', data)
+      
+      setGameId(data.game_id)
+      setUserId(data.user_id)
+      setTotalRounds(data.total_rounds)
+      setShowGameSetup(false)
+      
+      // Создаем и запускаем первый раунд
+      await createAndStartRound(data.game_id, 1)
+      
+    } catch (error) {
+      console.error('Error starting game:', error)
+      alert(`Ошибка при создании игры: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+  
+  // Создать и запустить раунд
+  const createAndStartRound = async (gameId: number, roundNumber: number) => {
+    try {
+      // Создаем раунд
+      const createResponse = await fetch('/api/round/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: gameId,
+          round_number: roundNumber,
+          theme_id: gameSettings?.themeId || null,
+          questions_count: 10,
+        }),
+      })
+      
+      if (!createResponse.ok) {
+        throw new Error('Failed to create round')
+      }
+      
+      const roundData = await createResponse.json()
+      console.log('✅ Round created:', roundData)
+      
+      // Запускаем раунд
+      const startResponse = await fetch('/api/round/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: gameId,
+          round_id: roundData.round_id,
+        }),
+      })
+      
+      if (!startResponse.ok) {
+        throw new Error('Failed to start round')
+      }
+      
+      console.log('✅ Round started')
+      setRoundNumber(roundNumber)
+      setShowRoundSummary(false)
+      setRoundCompleted(false)
+      setQuestionId(null)
+      fetchLeaderboard(true)
+      
+    } catch (error) {
+      console.error('Error creating/starting round:', error)
+      alert(`Ошибка при создании раунда: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
   
   // Логируем полученные параметры
   useEffect(() => {
     console.log(`🎮 App initialized: game_id=${gameId}, user_id=${userId}`)
     if (!gameId || !userId) {
-      console.warn('⚠️ game_id or user_id missing from URL. Using mock data fallback.')
+      console.log('ℹ️ No game_id or user_id in URL. Will show game setup.')
     }
   }, [gameId, userId])
 
@@ -129,6 +232,12 @@ function App() {
   }
 
   useEffect(() => {
+    // Не загружаем лидерборд, если игра не создана
+    if (!gameId || !userId) {
+      console.log('⏭️ App: Skipping leaderboard fetch (game not created yet)')
+      return
+    }
+    
     console.log('🚀 App: Initial mount, fetching leaderboard')
     // При первой загрузке обновляем счетчик, но он должен быть 0 или 1
     // Если счетчик больше 1, значит вопрос уже загружен, и мы обновим его правильно
@@ -136,33 +245,60 @@ function App() {
     // Обновляем таблицу лидеров каждые 2 секунды (БЕЗ обновления счетчика вопроса)
     // НО только если не показывается summary раунда
     const interval = setInterval(() => {
-      if (!showRoundSummary) {
+      if (!showRoundSummary && gameId && userId) {
         console.log('⏰ App: Periodic leaderboard update (no counter update)')
         fetchLeaderboard(false)
       } else {
-        console.log('⏰ App: Skipping periodic update (round summary is showing)')
+        console.log('⏰ App: Skipping periodic update (round summary is showing or game not ready)')
       }
     }, 2000)
     return () => clearInterval(interval)
-  }, [showRoundSummary])
+  }, [showRoundSummary, gameId, userId])
 
   const handleQuestionChange = (id: number | null) => {
     setQuestionId(id)
   }
 
   const handleNextRound = async () => {
-    // Сбрасываем раунд на API
-    try {
-      await fetch('/api/round/reset', { method: 'POST' })
-    } catch (error) {
-      console.error('Failed to reset round:', error)
+    if (!gameId) {
+      console.error('Cannot start next round: gameId is null')
+      return
     }
     
-    setRoundNumber(prev => prev + 1)
-    setShowRoundSummary(false)
-    setRoundCompleted(false) // Сбрасываем флаг завершения раунда
-    setQuestionId(null) // Сбрасываем вопрос для загрузки нового
-    fetchLeaderboard(true)
+    const nextRoundNumber = roundNumber + 1
+    
+    // Завершаем текущий раунд (если есть)
+    if (roundNumber > 0) {
+      try {
+        // TODO: Получить round_id текущего раунда и завершить его
+        // Пока просто создаем следующий раунд
+      } catch (error) {
+        console.error('Error finishing current round:', error)
+      }
+    }
+    
+    // Создаем и запускаем следующий раунд
+    await createAndStartRound(gameId, nextRoundNumber)
+  }
+
+  // Показываем экран настройки игры, если игра не создана
+  if (showGameSetup) {
+    return (
+      <div className="app">
+        <GameSetup onStartGame={handleStartGame} />
+      </div>
+    )
+  }
+  
+  // Показываем экран загрузки, если игра создается
+  if (!gameId || !userId) {
+    return (
+      <div className="app">
+        <div className="loading-screen">
+          <h2>Загрузка...</h2>
+        </div>
+      </div>
+    )
   }
 
   if (showRoundSummary) {

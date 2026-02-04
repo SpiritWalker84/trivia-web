@@ -130,6 +130,25 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       setQuestion(data.question)
       setRoundQuestionId(data.round_question_id || null)
       
+      // Отмечаем вопрос как показанный (для standalone frontend)
+      if (data.round_question_id) {
+        try {
+          await fetch('/api/question/mark-displayed', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              round_question_id: data.round_question_id,
+            }),
+          })
+          console.log('✅ Question marked as displayed:', data.round_question_id)
+        } catch (error) {
+          console.warn('⚠️ Failed to mark question as displayed:', error)
+          // Не критично, продолжаем работу
+        }
+      }
+      
       // Уведомляем о загрузке вопроса - это обновит счетчик в App
       // Вызываем СРАЗУ после установки вопроса
       console.log('📊 fetchRandomQuestion: Calling onQuestionLoaded to update counter')
