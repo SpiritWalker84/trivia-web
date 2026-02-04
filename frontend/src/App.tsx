@@ -250,7 +250,14 @@ function App() {
         
         console.log(`📋 fetchLeaderboard: updateQuestionNumber=${updateQuestionNumber}, API returned questionNum=${questionNum}, current state=${currentQuestionNumber}`)
         
-        setParticipants(data.participants || [])
+        // Логируем данные о выбывших игроках
+        const participants = data.participants || []
+        const eliminated = participants.filter((p: Participant) => p.is_eliminated === true)
+        if (eliminated.length > 0) {
+          console.log('📋 fetchLeaderboard: Found eliminated participants:', eliminated.map((p: Participant) => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated, correct_answers: p.correct_answers })))
+        }
+        
+        setParticipants(participants)
         
         // Обновляем номер вопроса только если явно запрошено
         // (чтобы не обновлять счетчик до загрузки вопроса)
