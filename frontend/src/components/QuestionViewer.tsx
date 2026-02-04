@@ -272,7 +272,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       clearTimeout(nextQuestionTimeoutRef.current)
     }
 
-    console.log('handleTimeUp: Scheduling next question in 3 seconds')
+    console.log('handleTimeUp: Scheduling next question in 2.5 seconds')
     nextQuestionTimeoutRef.current = setTimeout(() => {
       console.log('handleTimeUp: Timeout fired, fetching next question')
       // Проверяем еще раз перед загрузкой
@@ -285,7 +285,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       // fetchRandomQuestion сам установит флаг обратно
       isNextQuestionScheduled.current = false
       fetchRandomQuestion()
-    }, 3000)
+    }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
   }
 
   const handleAnswerClick = (answerId: number) => {
@@ -313,7 +313,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
     
     isNextQuestionScheduled.current = true
-    console.log('handleAnswerClick: Scheduling next question in 3 seconds')
+    console.log('handleAnswerClick: Scheduling next question in 2.5 seconds')
     nextQuestionTimeoutRef.current = setTimeout(() => {
       console.log('handleAnswerClick: Timeout fired, fetching next question')
       // Проверяем еще раз перед загрузкой
@@ -325,7 +325,7 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       // Сбрасываем флаг только перед вызовом fetchRandomQuestion
       isNextQuestionScheduled.current = false
       fetchRandomQuestion()
-    }, 3000)
+    }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
   }
 
   const sendAnswer = async (questionId: number, answerId: number, isCorrect: boolean) => {
