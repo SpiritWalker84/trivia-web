@@ -21,6 +21,7 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
   const [gameType, setGameType] = useState<'training' | 'private'>('training')
   const [botDifficulty, setBotDifficulty] = useState<'novice' | 'amateur' | 'expert'>('amateur')
   const [isLoadingName, setIsLoadingName] = useState(!!telegramId && !initialPlayerName)
+  const [showRules, setShowRules] = useState(false)
 
   // Загружаем имя пользователя, если есть telegram_id
   useEffect(() => {
@@ -77,6 +78,21 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
     >
+      {showRules && (
+        <div className="rules-overlay" onClick={() => setShowRules(false)}>
+          <div className="rules-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>📘 Правила игры</h2>
+            <p>
+              Игра состоит из 9 раундов по 10 вопросов. В каждом раунде выбывает один игрок,
+              который дал меньше всего правильных ответов. При равенстве минимального количества
+              ответов выбывает тот, кто потратил больше времени на ответы в раунде.
+            </p>
+            <button className="btn-close-rules" onClick={() => setShowRules(false)}>
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
       <div className="game-setup-header">
         <h1>🎮 Brain Survivor</h1>
         <p>Выберите тип игры</p>
@@ -153,7 +169,7 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
               >
                 <span className="difficulty-icon">🌱</span>
                 <span className="difficulty-title">Новичок</span>
-                <span className="difficulty-desc">55% точность</span>
+                <span className="difficulty-desc">45% точность</span>
               </motion.button>
               
               <motion.button
@@ -165,7 +181,7 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
               >
                 <span className="difficulty-icon">⚡</span>
                 <span className="difficulty-title">Любитель</span>
-                <span className="difficulty-desc">68% точность</span>
+                <span className="difficulty-desc">55% точность</span>
               </motion.button>
               
               <motion.button
@@ -177,20 +193,31 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
               >
                 <span className="difficulty-icon">🔥</span>
                 <span className="difficulty-title">Эксперт</span>
-                <span className="difficulty-desc">80% точность</span>
+                <span className="difficulty-desc">70% точность</span>
               </motion.button>
             </div>
           </div>
         )}
 
-        <motion.button
-          type="submit"
-          className="btn-start-game"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          🚀 Начать игру
-        </motion.button>
+        <div className="game-setup-actions">
+          <motion.button
+            type="button"
+            className="btn-rules"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowRules(true)}
+          >
+            📘 Правила
+          </motion.button>
+          <motion.button
+            type="submit"
+            className="btn-start-game"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            🚀 Начать игру
+          </motion.button>
+        </div>
       </form>
     </motion.div>
   )
