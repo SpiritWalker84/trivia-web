@@ -1364,6 +1364,66 @@ async def leave_game(request: LeaveGameRequest):
     print("Player left the game via web interface (mock)")
     return {"success": True, "message": "Game left successfully"}
 
+@app.post("/api/admin/stop-all-games")
+async def stop_all_games(request: AdminStopAllGamesRequest):
+    """
+    Остановить все активные игры (только для администратора)
+    """
+    # Проверяем права администратора
+    if request.telegram_id != ADMIN_TELEGRAM_ID:
+        raise HTTPException(status_code=403, detail="Access denied. Admin rights required.")
+    
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from datetime import datetime
+        import pytz
+        
+        with get_db_session() as session:
+            # Находим все активные игры
+            active_games = session.query(Game).filter(
+                Game.status.in_(['waiting', 'pre_start', 'in_progress'])
+            ).all()
+            
+            stopped_count = 0
+            for game in active_games:
+                # Останавливаем игру
+                game.status = 'finished'
+                game.finished_at = datetime.now(pytz.UTC)
+                
+                # Останавливаем все активные раунды этой игры
+                active_rounds = session.query(Round).filter(
+                    and_(
+                        Round.game_id == game.id,
+                        Round.status == 'in_progress'
+                    )
+                ).all()
+                
+                for round_obj in active_rounds:
+                    round_obj.status = 'finished'
+                    round_obj.finished_at = datetime.now(pytz.UTC)
+                
+                stopped_count += 1
+                print(f"Stopped game {game.id} (type: {game.game_type}, rounds: {len(active_rounds)})")
+            
+            session.commit()
+            
+            print(f"Admin {request.telegram_id} stopped {stopped_count} active games")
+            return {
+                "success": True,
+                "stopped_games": stopped_count,
+                "message": f"Stopped {stopped_count} active game(s)"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error stopping all games: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error stopping all games: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
