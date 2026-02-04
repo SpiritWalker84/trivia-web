@@ -3,6 +3,16 @@
   max-width: 600px;
   margin: 0 auto;
   padding: 3rem 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* Полное скрытие GameSetup при необходимости */
+.game-setup.hidden {
+  display: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .game-setup-header {

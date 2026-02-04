@@ -55,6 +55,13 @@ function App() {
     console.log('🎮 Starting game with settings:', settings)
     setGameSettings(settings)
     
+    // Сразу скрываем GameSetup и показываем экран загрузки
+    setShowGameSetup(false)
+    setIsCreatingGame(true)
+    
+    // Небольшая задержка для завершения анимации скрытия GameSetup
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
     try {
       // Создаем игру через API
       // Если есть telegram_id из URL (пользователь пришел из бота), используем его
@@ -84,7 +91,7 @@ function App() {
       setGameId(data.game_id)
       setUserId(data.user_id)
       setTotalRounds(data.total_rounds)
-      setShowGameSetup(false)
+      // showGameSetup уже установлен в false в начале функции
       setIsCreatingGame(false)
       
       // Создаем и запускаем первый раунд
@@ -363,8 +370,9 @@ function App() {
     )
   }
   
-  // Показываем экран загрузки только если игра создается
-  if (isCreatingGame) {
+  // Показываем экран загрузки, если игра создается или еще не создана
+  // Это гарантирует, что GameSetup полностью скрыт перед показом игрового экрана
+  if (!gameId || !userId || isCreatingGame) {
     return (
       <div className="app">
         <div className="loading-screen">
@@ -376,17 +384,6 @@ function App() {
             <h2>🎮 Загрузка игры...</h2>
             <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Подождите, игра создается</p>
           </motion.div>
-        </div>
-      </div>
-    )
-  }
-  
-  // Показываем экран загрузки, если игра не создана (fallback)
-  if (!gameId || !userId) {
-    return (
-      <div className="app">
-        <div className="loading-screen">
-          <h2>Загрузка...</h2>
         </div>
       </div>
     )
