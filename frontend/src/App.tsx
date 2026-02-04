@@ -420,6 +420,7 @@ function App() {
         const data = await response.json()
         const questionNum = data.current_question_number || 1
         const totalQ = data.total_questions || 10
+        const roundStatus = data.round_status
         
         console.log(`📋 fetchLeaderboard: updateQuestionNumber=${updateQuestionNumber}, API returned questionNum=${questionNum}, current state=${currentQuestionNumber}`)
         
@@ -446,7 +447,12 @@ function App() {
         // Раунд завершен ТОЛЬКО когда был вызван onRoundComplete (получен 400 от API)
         // НЕ показываем summary по счетчику, так как он может быть неточным
         // НЕ меняем showRoundSummary, если он уже установлен (чтобы не перерисовывать таблицу)
-        if (roundCompleted && !showRoundSummary && !isStartingRoundRef.current) {
+        if (roundStatus && roundStatus !== 'in_progress' && !isStartingRoundRef.current) {
+          setRoundCompleted(true)
+          setShowRoundSummary(true)
+          setQuestionId(null)
+          setCurrentQuestion(null)
+        } else if (roundCompleted && !showRoundSummary && !isStartingRoundRef.current) {
           console.log(`Setting showRoundSummary=true: roundCompleted=true, questionNum=${questionNum}, totalQ=${totalQ}`)
           setShowRoundSummary(true)
         } else if (!roundCompleted && !showRoundSummary) {

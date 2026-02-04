@@ -34,4 +34,6 @@ export interface LeaderboardData {
   participants: Participant[]
   current_question_number?: number
   total_questions?: number
+  round_status?: string
+  game_status?: string
 }

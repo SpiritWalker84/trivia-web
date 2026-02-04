@@ -176,6 +176,8 @@ class LeaderboardResponse(BaseModel):
     participants: List[Participant]
     current_question_number: int
     total_questions: int
+    round_status: Optional[str] = None
+    game_status: Optional[str] = None
 
 # Моковые данные - вопросы
 MOCK_QUESTIONS = [
@@ -788,7 +790,9 @@ async def get_leaderboard(
                 return LeaderboardResponse(
                     participants=participants,
                     current_question_number=current_question_num,
-                    total_questions=total_questions
+                    total_questions=total_questions,
+                    round_status=current_round.status if current_round else None,
+                    game_status=game.status if game else None
                 )
         
         # Fallback: используем мок-данные
@@ -815,7 +819,8 @@ async def get_leaderboard(
         return LeaderboardResponse(
             participants=participants,
             current_question_number=current_round_question,
-            total_questions=10
+            total_questions=10,
+            round_status="in_progress"
         )
     except HTTPException:
         raise
