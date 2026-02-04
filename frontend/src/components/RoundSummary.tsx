@@ -8,6 +8,7 @@ interface RoundSummaryProps {
   roundNumber: number
   totalRounds: number
   onNextRound: () => void
+  gameFinishedAllHumansEliminated?: boolean // Игра завершена: все живые игроки выбыли
 }
 
 const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: RoundSummaryProps) => {

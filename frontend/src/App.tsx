@@ -49,6 +49,7 @@ function App() {
   const [roundNumber, setRoundNumber] = useState(1)
   const [totalRounds, setTotalRounds] = useState(9)
   const [roundCompleted, setRoundCompleted] = useState(false) // Флаг завершения раунда
+  const [gameFinishedAllHumansEliminated, setGameFinishedAllHumansEliminated] = useState(false) // Игра завершена: все живые игроки выбыли
   
   // Обработчик старта игры
   const handleStartGame = async (settings: GameSettings) => {
