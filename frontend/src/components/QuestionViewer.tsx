@@ -29,6 +29,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
   const questionLoadTimeRef = useRef<number | null>(null) // Время загрузки вопроса
   const previousQuestionIdRef = useRef<number | null>(null) // Предыдущий questionId для отслеживания изменений
 
+  // Передаем handleTimeUp в родительский компонент через callback
+  useEffect(() => {
+    if (onTimerTimeUp) {
+      onTimerTimeUp(handleTimeUp)
+    }
+  }, [onTimerTimeUp, question, showResult, showRoundSummary])
+
   useEffect(() => {
     // Не загружаем вопросы, если показывается summary раунда
     if (showRoundSummary) {
