@@ -52,6 +52,7 @@ function App() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const questionViewerTimeUpRef = useRef<(() => void) | null>(null) // Ref для вызова handleTimeUp из QuestionViewer
   const roundFinishRequestedRef = useRef(false) // Защита от двойного завершения раунда
+  const isStartingRoundRef = useRef(false) // Защита от вспышки summary при старте раунда
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [totalQuestions, setTotalQuestions] = useState(10)
   const [showRoundSummary, setShowRoundSummary] = useState(false)
@@ -115,7 +116,7 @@ function App() {
     }
   }
 
-  const handleCreatePrivate = async (playerName: string) => {
+  const handleCreatePrivate = async (playerName: string, botDifficulty?: GameSettings['botDifficulty']) => {
     console.log('🎮 Creating private game:', playerName)
     setShowGameSetup(false)
     setIsCreatingGame(true)
@@ -128,6 +129,7 @@ function App() {
         body: JSON.stringify({
           player_name: playerName,
           player_telegram_id: telegramId,
+          bot_difficulty: botDifficulty,
         }),
       })
       if (!response.ok) {
@@ -276,6 +278,7 @@ function App() {
   
   // Создать и запустить раунд
   const createAndStartRound = async (gameId: number, roundNumber: number) => {
+    isStartingRoundRef.current = true
     try {
       // Создаем раунд
       const createResponse = await fetch('/api/round/create', {
@@ -443,7 +446,7 @@ function App() {
         // Раунд завершен ТОЛЬКО когда был вызван onRoundComplete (получен 400 от API)
         // НЕ показываем summary по счетчику, так как он может быть неточным
         // НЕ меняем showRoundSummary, если он уже установлен (чтобы не перерисовывать таблицу)
-        if (roundCompleted && !showRoundSummary) {
+        if (roundCompleted && !showRoundSummary && !isStartingRoundRef.current) {
           console.log(`Setting showRoundSummary=true: roundCompleted=true, questionNum=${questionNum}, totalQ=${totalQ}`)
           setShowRoundSummary(true)
         } else if (!roundCompleted && !showRoundSummary) {
@@ -726,7 +729,7 @@ function App() {
                     console.log(`✅ Round ${roundNumber} finished in onRoundComplete:`, finishData)
                     
                     // Проверяем, остановлена ли игра из-за выбытия всех живых игроков
-                    if (finishData.all_humans_eliminated === true || finishData.game_status === 'finished') {
+                    if (finishData.all_humans_eliminated === true) {
                       console.log('⚠️ Game finished: all human players eliminated')
                       setGameFinishedAllHumansEliminated(true)
                     }
@@ -748,6 +751,7 @@ function App() {
             onQuestionLoaded={(question) => {
               console.log('📊 App: onQuestionLoaded called, fetching leaderboard with counter update')
               setCurrentQuestion(question)
+              isStartingRoundRef.current = false
               fetchLeaderboard(true)
             }} // Обновляем счетчик только после загрузки вопроса
             showRoundSummary={showRoundSummary} // Передаем флаг, чтобы не загружать вопросы во время summary

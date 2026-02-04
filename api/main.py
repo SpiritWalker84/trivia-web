@@ -887,6 +887,7 @@ class MarkQuestionDisplayedRequest(BaseModel):
 class CreatePrivateGameRequest(BaseModel):
     player_name: str
     player_telegram_id: Optional[int] = None
+    bot_difficulty: Optional[str] = None
 
 class CreatePrivateGameResponse(BaseModel):
     game_id: int
@@ -1075,7 +1076,8 @@ async def create_private_game(request: CreatePrivateGameRequest):
                 theme_id=None,
                 status='waiting',
                 total_rounds=9,
-                current_round=0
+                current_round=0,
+                bot_difficulty=request.bot_difficulty
             )
             session.add(game)
             session.flush()

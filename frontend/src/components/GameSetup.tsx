@@ -4,7 +4,7 @@ import './GameSetup.css'
 
 interface GameSetupProps {
   onStartGame: (settings: GameSettings) => void
-  onCreatePrivate: (playerName: string) => void
+  onCreatePrivate: (playerName: string, botDifficulty?: GameSettings['botDifficulty']) => void
   onJoinPrivate: (playerName: string, roomCode: string) => void
   initialGameType?: 'training' | 'private'
   initialPrivateMode?: 'create' | 'join'
@@ -269,7 +269,7 @@ const GameSetup = ({
                     return
                   }
                   if (privateMode === 'create') {
-                    onCreatePrivate(playerName.trim())
+                    onCreatePrivate(playerName.trim(), botDifficulty)
                   } else {
                     if (!roomCode.trim()) {
                       alert('Введите код комнаты')
@@ -280,6 +280,49 @@ const GameSetup = ({
                 }}
               >
                 {privateMode === 'create' ? 'Создать комнату' : 'Войти в комнату'}
+              </motion.button>
+            </div>
+          </div>
+        )}
+
+        {gameType === 'private' && privateMode === 'create' && (
+          <div className="form-group">
+            <label htmlFor="botDifficultyPrivate">Уровень сложности ботов *</label>
+            <div className="bot-difficulty-buttons">
+              <motion.button
+                type="button"
+                className={`bot-difficulty-btn ${botDifficulty === 'novice' ? 'active' : ''}`}
+                onClick={() => setBotDifficulty('novice')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="difficulty-icon">🌱</span>
+                <span className="difficulty-title">Новичок</span>
+                <span className="difficulty-desc">45% точность</span>
+              </motion.button>
+              
+              <motion.button
+                type="button"
+                className={`bot-difficulty-btn ${botDifficulty === 'amateur' ? 'active' : ''}`}
+                onClick={() => setBotDifficulty('amateur')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="difficulty-icon">⚡</span>
+                <span className="difficulty-title">Любитель</span>
+                <span className="difficulty-desc">55% точность</span>
+              </motion.button>
+              
+              <motion.button
+                type="button"
+                className={`bot-difficulty-btn ${botDifficulty === 'expert' ? 'active' : ''}`}
+                onClick={() => setBotDifficulty('expert')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="difficulty-icon">🔥</span>
+                <span className="difficulty-title">Эксперт</span>
+                <span className="difficulty-desc">70% точность</span>
               </motion.button>
             </div>
           </div>
