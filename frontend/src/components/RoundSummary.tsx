@@ -83,8 +83,17 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
     total: sortedParticipants.length,
     active: activeParticipants.length,
     eliminated: eliminatedParticipants.length,
-    eliminatedList: eliminatedParticipants.map(p => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated }))
+    eliminatedList: eliminatedParticipants.map(p => ({ id: p.id, name: p.name, is_eliminated: p.is_eliminated, correct_answers: p.correct_answers }))
   })
+  // Дополнительное логирование всех участников
+  console.log('RoundSummary: All participants with is_eliminated:', sortedParticipants.map(p => ({ 
+    id: p.id, 
+    name: p.name, 
+    is_eliminated: p.is_eliminated, 
+    is_eliminated_type: typeof p.is_eliminated,
+    is_eliminated_strict: p.is_eliminated === true,
+    correct_answers: p.correct_answers 
+  })))
 
   const getRankIcon = (index: number) => {
     if (index === 0) return '🥇'
