@@ -43,6 +43,7 @@ function App() {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null) // Текущий вопрос для таймера
   const [participants, setParticipants] = useState<Participant[]>([])
   const questionViewerTimeUpRef = useRef<(() => void) | null>(null) // Ref для вызова handleTimeUp из QuestionViewer
+  const roundFinishRequestedRef = useRef(false) // Защита от двойного завершения раунда
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [totalQuestions, setTotalQuestions] = useState(10)
   const [showRoundSummary, setShowRoundSummary] = useState(false)
@@ -148,6 +149,7 @@ function App() {
       
       console.log('✅ Round started')
       setRoundNumber(roundNumber)
+      roundFinishRequestedRef.current = false
       setShowRoundSummary(false)
       setRoundCompleted(false)
       
@@ -342,33 +344,8 @@ function App() {
     
     const nextRoundNumber = roundNumber + 1
     
-    // Завершаем текущий раунд (если есть)
-    if (roundNumber > 0) {
-      try {
-        // Завершаем текущий раунд через API
-        const finishResponse = await fetch(`/api/round/finish-current?game_id=${gameId}`, {
-          method: 'POST',
-        })
-        if (finishResponse.ok) {
-          const finishData = await finishResponse.json()
-          console.log(`✅ Round ${roundNumber} finished:`, finishData)
-          // Обновляем лидерборд сразу после завершения раунда, чтобы получить актуальные данные о выбывших
-          await fetchLeaderboard(true)
-          
-          // Проверяем статус игры - если игра остановлена (все человеческие игроки выбыли), не создаем новый раунд
-          if (finishData.game_status === 'finished') {
-            console.log('⚠️ Game is finished (all human players eliminated), stopping')
-            setGameFinishedAllHumansEliminated(true)
-            return
-          }
-        } else {
-          console.warn('Failed to finish current round, continuing anyway')
-        }
-      } catch (error) {
-        console.error('Error finishing current round:', error)
-        // Продолжаем создание следующего раунда даже если не удалось завершить текущий
-      }
-    }
+    // Завершение текущего раунда происходит в onRoundComplete,
+    // здесь не дублируем, чтобы не выбивать игроков дважды.
     
     // Проверяем, не превысили ли мы максимальное количество раундов
     if (nextRoundNumber > totalRounds) {
@@ -480,6 +457,11 @@ function App() {
             onQuestionChange={handleQuestionChange}
             onRoundComplete={async () => {
               console.log('📊 App: onRoundComplete called, round is completed')
+              if (roundFinishRequestedRef.current) {
+                console.log('⚠️ Round finish already requested, skipping duplicate call')
+                return
+              }
+              roundFinishRequestedRef.current = true
               // Сначала завершаем текущий раунд через API, чтобы обновить статус выбывших игроков
               if (gameId && roundNumber > 0) {
                 try {
