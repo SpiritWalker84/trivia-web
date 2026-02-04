@@ -184,6 +184,10 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       setRoundQuestionId(data.round_question_id || null)
       // Сохраняем время загрузки вопроса для вычисления времени ответа
       questionLoadTimeRef.current = Date.now()
+      // Обновляем previousQuestionIdRef после успешной загрузки
+      if (data.question && data.question.id) {
+        previousQuestionIdRef.current = data.question.id
+      }
       
       // Отмечаем вопрос как показанный (для standalone frontend)
       if (data.round_question_id) {
