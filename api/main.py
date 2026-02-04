@@ -1224,6 +1224,16 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
             session.flush()
             session.commit()
             
+            # Проверяем, что выбывший игрок действительно помечен как выбывший после commit
+            if len(active_players) > 1:
+                # Создаем новую сессию для проверки, чтобы убедиться, что данные сохранены
+                with get_db_session() as check_session:
+                    check_gp = check_session.query(GamePlayer).filter(GamePlayer.id == eliminated_player.id).first()
+                    if check_gp:
+                        print(f"DEBUG: After commit (new session), eliminated player {check_gp.user_id} is_eliminated={check_gp.is_eliminated}")
+                    else:
+                        print(f"DEBUG: Could not find GamePlayer {eliminated_player.id} in new session")
+            
             print(f"Current round finished: round_id={current_round.id}, round_number={current_round.round_number}")
             return {"success": True, "round_id": current_round.id, "round_number": current_round.round_number}
             
