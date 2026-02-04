@@ -81,13 +81,16 @@ function App() {
       setUserId(data.user_id)
       setTotalRounds(data.total_rounds)
       setShowGameSetup(false)
+      setIsCreatingGame(false)
       
       // Создаем и запускаем первый раунд
       await createAndStartRound(data.game_id, 1)
       
     } catch (error) {
       console.error('Error starting game:', error)
+      setIsCreatingGame(false)
       alert(`Ошибка при создании игры: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Оставляем на экране настройки, чтобы пользователь мог попробовать снова
     }
   }
   

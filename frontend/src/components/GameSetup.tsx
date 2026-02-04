@@ -23,8 +23,14 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
   // Загружаем имя пользователя, если есть telegram_id
   useEffect(() => {
     if (telegramId && !initialPlayerName) {
+      setIsLoadingName(true)
       fetch(`/api/user/info?telegram_id=${telegramId}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`)
+          }
+          return res.json()
+        })
         .then(data => {
           if (data.exists && data.full_name) {
             setPlayerName(data.full_name)
@@ -41,6 +47,8 @@ const GameSetup = ({ onStartGame, telegramId, initialPlayerName }: GameSetupProp
         })
     } else if (initialPlayerName) {
       setPlayerName(initialPlayerName)
+      setIsLoadingName(false)
+    } else if (!telegramId) {
       setIsLoadingName(false)
     }
   }, [telegramId, initialPlayerName])
