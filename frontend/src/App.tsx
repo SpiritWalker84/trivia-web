@@ -302,6 +302,12 @@ function App() {
     setQuestionId(id)
   }
 
+  const handleTimerTimeUp = () => {
+    // Когда таймер заканчивается, сбрасываем questionId, чтобы QuestionViewer загрузил следующий вопрос
+    console.log('⏰ App: Timer time up, resetting questionId to load next question')
+    setQuestionId(null)
+  }
+
   const handleNextRound = async () => {
     if (!gameId) {
       console.error('Cannot start next round: gameId is null')
@@ -419,7 +425,7 @@ function App() {
               <Timer
                 key={currentQuestion.id}
                 initialTime={currentQuestion.time_limit || 10}
-                onTimeUp={() => {}}
+                onTimeUp={handleTimerTimeUp}
                 isActive={true}
               />
             </div>

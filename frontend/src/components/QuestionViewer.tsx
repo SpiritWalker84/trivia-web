@@ -281,6 +281,32 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
     setSelectedAnswer(answerId)
     setShowResult(true)
+    
+    // Планируем загрузку следующего вопроса через 3 секунды после ответа
+    if (nextQuestionTimeoutRef.current) {
+      clearTimeout(nextQuestionTimeoutRef.current)
+    }
+    
+    // Проверяем, не запланирован ли уже следующий вопрос
+    if (isNextQuestionScheduled.current) {
+      console.log('handleAnswerClick: Next question already scheduled, skipping')
+      return
+    }
+    
+    isNextQuestionScheduled.current = true
+    console.log('handleAnswerClick: Scheduling next question in 3 seconds')
+    nextQuestionTimeoutRef.current = setTimeout(() => {
+      console.log('handleAnswerClick: Timeout fired, fetching next question')
+      // Проверяем еще раз перед загрузкой
+      if (showRoundSummary) {
+        console.log('handleAnswerClick: Skipping fetch (round summary is showing)')
+        isNextQuestionScheduled.current = false
+        return
+      }
+      // Сбрасываем флаг только перед вызовом fetchRandomQuestion
+      isNextQuestionScheduled.current = false
+      fetchRandomQuestion()
+    }, 3000)
   }
 
   const sendAnswer = async (questionId: number, answerId: number, isCorrect: boolean) => {
