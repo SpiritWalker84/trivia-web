@@ -402,6 +402,8 @@ async def get_random_question(
 ):
     """Получить следующий вопрос из текущего раунда игры"""
     import traceback
+    from datetime import datetime, timedelta
+    import pytz
     global current_round_question
     
     print(f"=== /api/questions/random CALLED ===")
@@ -437,16 +439,35 @@ async def get_random_question(
                     RoundQuestion.round_id == current_round.id
                 ).scalar()
                 
-                # Берем первый непоказанный вопрос (который бот покажет следующим)
-                # Это обеспечивает синхронизацию с ботом - веб-интерфейс показывает тот же вопрос, что и бот
-                round_question = session.query(RoundQuestion).filter(
+                # Логика текущего вопроса:
+                # 1) Если есть показанный вопрос и его время еще не истекло, возвращаем его (для синхронизации игроков)
+                # 2) Иначе берем первый непоказанный вопрос
+                now = datetime.now(pytz.UTC)
+                displayed_question = session.query(RoundQuestion).filter(
                     and_(
                         RoundQuestion.round_id == current_round.id,
-                        RoundQuestion.displayed_at.is_(None)
+                        RoundQuestion.displayed_at.isnot(None)
                     )
-                ).order_by(RoundQuestion.question_number).first()
-                
-                # Если все вопросы показаны, раунд завершен
+                ).order_by(RoundQuestion.displayed_at.desc()).first()
+
+                round_question = None
+                if displayed_question and displayed_question.displayed_at:
+                    time_limit = displayed_question.time_limit_sec or 10
+                    # Дополнительная пауза между вопросами (2.5 сек)
+                    active_until = displayed_question.displayed_at + timedelta(seconds=time_limit + 2.5)
+                    if now <= active_until:
+                        round_question = displayed_question
+
+                if not round_question:
+                    # Берем первый непоказанный вопрос
+                    round_question = session.query(RoundQuestion).filter(
+                        and_(
+                            RoundQuestion.round_id == current_round.id,
+                            RoundQuestion.displayed_at.is_(None)
+                        )
+                    ).order_by(RoundQuestion.question_number).first()
+
+                # Если все вопросы показаны и активного нет, раунд завершен
                 if not round_question:
                     raise HTTPException(status_code=400, detail="Round completed. Please start a new round.")
                 
@@ -1503,6 +1524,26 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 if not current_round:
                     raise HTTPException(status_code=404, detail="No round found")
             
+            # Если раунд уже завершен, не выполняем повторное выбытие
+            if current_round.status == 'finished':
+                game = session.query(Game).filter(Game.id == game_id).first()
+                remaining_active_humans = session.query(GamePlayer).join(User).filter(
+                    and_(
+                        GamePlayer.game_id == game_id,
+                        GamePlayer.is_eliminated == False,
+                        GamePlayer.left_game == False,
+                        User.is_bot == False
+                    )
+                ).all()
+                all_humans_eliminated = len(remaining_active_humans) == 0
+                return {
+                    "success": True,
+                    "round_id": current_round.id,
+                    "round_number": current_round.round_number,
+                    "game_status": game.status if game else None,
+                    "all_humans_eliminated": all_humans_eliminated
+                }
+
             # Завершаем раунд
             current_round.status = 'finished'
             current_round.finished_at = datetime.now(pytz.UTC)
