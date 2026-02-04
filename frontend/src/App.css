@@ -134,7 +134,11 @@
 
   .app-sidebar {
     position: static;
-    order: -1;
+    order: 1; /* Лидерборд снизу на мобильных */
+  }
+
+  .app-main {
+    order: 0; /* Вопрос сверху на мобильных */
   }
 
   .app-header {
