@@ -1220,10 +1220,28 @@ async def finish_current_round(game_id: int = Query(..., description="ID игр�
                 # Проверяем, что значение установлено
                 session.refresh(eliminated_player)
                 print(f"DEBUG: After flush, GamePlayer {eliminated_player.id} is_eliminated={eliminated_player.is_eliminated}")
+                
+                # Проверяем, остались ли живые человеческие игроки (не боты)
+                remaining_active_players = session.query(GamePlayer).join(User).filter(
+                    and_(
+                        GamePlayer.game_id == game_id,
+                        GamePlayer.is_eliminated == False,
+                        GamePlayer.left_game == False,
+                        User.is_bot == False  # Только человеческие игроки
+                    )
+                ).all()
+                
+                # Если не осталось живых человеческих игроков, останавливаем игру
+                if len(remaining_active_players) == 0:
+                    game = session.query(Game).filter(Game.id == game_id).first()
+                    if game:
+                        game.status = 'finished'
+                        game.finished_at = datetime.now(pytz.UTC)
+                        print(f"Game {game_id} stopped: all human players eliminated, only bots remain")
             
-            # Проверяем, нужно ли завершить игру
+            # Проверяем, нужно ли завершить игру (по количеству раундов)
             game = session.query(Game).filter(Game.id == game_id).first()
-            if current_round.round_number >= game.total_rounds:
+            if game and current_round.round_number >= game.total_rounds:
                 game.status = 'finished'
                 game.finished_at = datetime.now(pytz.UTC)
             
