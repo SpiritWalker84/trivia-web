@@ -144,7 +144,8 @@ function App() {
       // чтобы убедиться, что раунд полностью создан в БД
       setTimeout(() => {
         fetchLeaderboard(true)
-        // Вопрос загрузится автоматически через QuestionViewer
+        // Сбрасываем questionId, чтобы QuestionViewer загрузил новый вопрос
+        setQuestionId(null)
       }, 500)
       
     } catch (error) {
