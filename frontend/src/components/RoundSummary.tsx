@@ -68,6 +68,9 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, gam
   // Обновляем таймер для 30 секунд вместо 60
 
   const isLastRound = roundNumber >= totalRounds || gameFinishedAllHumansEliminated
+  const currentUser = sortedParticipants.find(p => p.is_current_user)
+  const maxScore = sortedParticipants.reduce((max, p) => Math.max(max, p.correct_answers), 0)
+  const isCurrentUserWinner = !!currentUser && currentUser.correct_answers === maxScore && currentUser.is_eliminated !== true
   // Сортируем: сначала активные (по убыванию очков), потом выбывшие
   const sortedParticipants = [...validParticipants].sort((a, b) => {
     // Сначала активные, потом выбывшие (явно проверяем на true)
@@ -131,7 +134,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, gam
           {gameFinishedAllHumansEliminated 
             ? '⛔ Игра завершена' 
             : isLastRound 
-              ? '🎉 Игра завершена!' 
+              ? (isCurrentUserWinner ? '🏆 Поздравляем, вы победили!' : '🎉 Игра завершена!')
               : `Раунд ${roundNumber} завершен`}
         </motion.h2>
         <motion.p
@@ -143,7 +146,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound, gam
           {gameFinishedAllHumansEliminated
             ? 'Все живые игроки выбыли'
             : isLastRound 
-              ? 'Финальные результаты' 
+              ? (isCurrentUserWinner ? 'Финальные результаты' : 'Финальные результаты')
               : 'Итоги раунда'}
         </motion.p>
       </div>
