@@ -13,21 +13,24 @@ function getUrlParams(): {
   telegramId: number | null
   gameId: number | null
   userId: number | null
+  roomCode: string | null
 } {
   const params = new URLSearchParams(window.location.search)
   const telegramId = params.get('telegram_id')
   const gameId = params.get('game_id')
   const userId = params.get('user_id')
+  const roomCode = params.get('room')
   return {
     telegramId: telegramId ? parseInt(telegramId, 10) : null,
     gameId: gameId ? parseInt(gameId, 10) : null,
     userId: userId ? parseInt(userId, 10) : null,
+    roomCode: roomCode ? roomCode.trim().toUpperCase() : null,
   }
 }
 
 function App() {
   // Получаем параметры из URL
-  const { telegramId, gameId: urlGameId, userId: urlUserId } = getUrlParams()
+  const { telegramId, gameId: urlGameId, userId: urlUserId, roomCode } = getUrlParams()
   
   // Состояние игры
   const [gameId, setGameId] = useState<number | null>(urlGameId)
@@ -530,6 +533,10 @@ function App() {
           onStartGame={handleStartGame} 
           onCreatePrivate={handleCreatePrivate}
           onJoinPrivate={handleJoinPrivate}
+          initialGameType={roomCode ? 'private' : undefined}
+          initialPrivateMode={roomCode ? 'join' : undefined}
+          initialRoomCode={roomCode || undefined}
+          autoJoinPrivate={!!roomCode && !!telegramId}
           telegramId={telegramId}
           initialPlayerName={userInfo?.full_name}
         />

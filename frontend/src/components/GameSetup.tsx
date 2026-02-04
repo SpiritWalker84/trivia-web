@@ -6,6 +6,10 @@ interface GameSetupProps {
   onStartGame: (settings: GameSettings) => void
   onCreatePrivate: (playerName: string) => void
   onJoinPrivate: (playerName: string, roomCode: string) => void
+  initialGameType?: 'training' | 'private'
+  initialPrivateMode?: 'create' | 'join'
+  initialRoomCode?: string
+  autoJoinPrivate?: boolean
   telegramId?: number | null  // Если пользователь пришел из бота
   initialPlayerName?: string  // Имя из бота (если есть)
 }
@@ -18,14 +22,25 @@ export interface GameSettings {
   botDifficulty?: 'novice' | 'amateur' | 'expert'  // Уровень сложности ботов для training
 }
 
-const GameSetup = ({ onStartGame, onCreatePrivate, onJoinPrivate, telegramId, initialPlayerName }: GameSetupProps) => {
+const GameSetup = ({
+  onStartGame,
+  onCreatePrivate,
+  onJoinPrivate,
+  initialGameType,
+  initialPrivateMode,
+  initialRoomCode,
+  autoJoinPrivate = false,
+  telegramId,
+  initialPlayerName,
+}: GameSetupProps) => {
   const [playerName, setPlayerName] = useState(initialPlayerName || '')
-  const [gameType, setGameType] = useState<'training' | 'private'>('training')
+  const [gameType, setGameType] = useState<'training' | 'private'>(initialGameType || 'training')
   const [botDifficulty, setBotDifficulty] = useState<'novice' | 'amateur' | 'expert'>('amateur')
   const [isLoadingName, setIsLoadingName] = useState(!!telegramId && !initialPlayerName)
   const [showRules, setShowRules] = useState(false)
-  const [privateMode, setPrivateMode] = useState<'create' | 'join'>('create')
-  const [roomCode, setRoomCode] = useState('')
+  const [privateMode, setPrivateMode] = useState<'create' | 'join'>(initialPrivateMode || 'create')
+  const [roomCode, setRoomCode] = useState(initialRoomCode || '')
+  const [autoJoinAttempted, setAutoJoinAttempted] = useState(false)
 
   // Загружаем имя пользователя, если есть telegram_id
   useEffect(() => {
@@ -59,6 +74,15 @@ const GameSetup = ({ onStartGame, onCreatePrivate, onJoinPrivate, telegramId, in
       setIsLoadingName(false)
     }
   }, [telegramId, initialPlayerName])
+
+  useEffect(() => {
+    if (!autoJoinPrivate || autoJoinAttempted) return
+    if (gameType !== 'private' || privateMode !== 'join') return
+    if (!roomCode.trim()) return
+    if (!playerName.trim()) return
+    setAutoJoinAttempted(true)
+    onJoinPrivate(playerName.trim(), roomCode.trim())
+  }, [autoJoinPrivate, autoJoinAttempted, gameType, privateMode, roomCode, playerName, onJoinPrivate])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
