@@ -303,10 +303,15 @@ function App() {
   }
 
   const handleTimerTimeUp = () => {
-    // Когда таймер заканчивается, сбрасываем questionId и currentQuestion, чтобы QuestionViewer загрузил следующий вопрос
-    console.log('⏰ App: Timer time up, resetting questionId to load next question')
-    setCurrentQuestion(null) // Сбрасываем текущий вопрос, чтобы таймер исчез
-    setQuestionId(null) // Сбрасываем questionId, чтобы загрузить следующий вопрос
+    // Когда таймер заканчивается, показываем правильный ответ, затем через 2-3 секунды загружаем следующий вопрос
+    console.log('⏰ App: Timer time up, will load next question after delay')
+    // Сбрасываем текущий вопрос, чтобы таймер исчез
+    setCurrentQuestion(null)
+    // Добавляем задержку в 2.5 секунды перед загрузкой следующего вопроса, чтобы пользователь успел увидеть правильный ответ
+    setTimeout(() => {
+      console.log('⏰ App: Delay passed, resetting questionId to load next question')
+      setQuestionId(null) // Сбрасываем questionId, чтобы загрузить следующий вопрос
+    }, 2500) // 2.5 секунды задержки
   }
 
   const handleNextRound = async () => {
