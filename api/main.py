@@ -49,6 +49,9 @@ load_dotenv()
 
 app = FastAPI(title="Trivia Web API", version="0.1.0")
 
+# Telegram ID администратора (можно переопределить через переменную окружения)
+ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "320889576"))
+
 # Настройка подключения к БД (если указан DATABASE_URL)
 DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "10"))
@@ -760,6 +763,9 @@ async def reset_round():
 class LeaveGameRequest(BaseModel):
     game_id: int
     user_id: int
+
+class AdminStopAllGamesRequest(BaseModel):
+    telegram_id: int
 
 # Модели для создания игры (standalone frontend)
 class CreateGameRequest(BaseModel):
