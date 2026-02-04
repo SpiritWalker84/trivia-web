@@ -97,8 +97,8 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
   }
 
-  const fetchRandomQuestion = async (retryCount = 0) => {
-    const preserveState = showResult && !!question && !!roundQuestionId
+  const fetchRandomQuestion = async (retryCount = 0, options: { silent?: boolean } = {}) => {
+    const preserveState = options.silent || (showResult && !!question && !!roundQuestionId)
     // Защита от повторных вызовов
     if (isNextQuestionScheduled.current && retryCount === 0) {
       console.warn('⚠️ fetchRandomQuestion: Already scheduled, skipping. isNextQuestionScheduled=true')
@@ -201,13 +201,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
       const newRoundQuestionId = data.round_question_id || null
       const isSameQuestion = newQuestionId === question?.id && newRoundQuestionId === roundQuestionId
 
-      if (isSameQuestion) {
+        if (isSameQuestion) {
         console.log('⏸️ fetchRandomQuestion: Same question returned, keeping current view')
-        if (preserveState && retryCount < 30) {
-          setTimeout(() => {
-            fetchRandomQuestion(retryCount + 1)
-          }, 1000)
-        }
+          if (preserveState && retryCount < 30) {
+            setTimeout(() => {
+              fetchRandomQuestion(retryCount + 1, { silent: true })
+            }, 1000)
+          }
         setLoading(false)
         isNextQuestionScheduled.current = false
         return
@@ -324,6 +324,19 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }
   }, [onTimerTimeUp, handleTimeUp])
 
+  useEffect(() => {
+    if (showRoundSummary) {
+      return
+    }
+    if (!showResult || !question || !roundQuestionId) {
+      return
+    }
+    const interval = setInterval(() => {
+      fetchRandomQuestion(0, { silent: true })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [showResult, question, roundQuestionId, showRoundSummary])
+
   const handleAnswerClick = (answerId: number) => {
     if (showResult) return
 
@@ -336,32 +349,9 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
 
     setSelectedAnswer(answerId)
     setShowResult(true)
-    
-    // Планируем загрузку следующего вопроса через 3 секунды после ответа
-    if (nextQuestionTimeoutRef.current) {
-      clearTimeout(nextQuestionTimeoutRef.current)
-    }
-    
-    // Проверяем, не запланирован ли уже следующий вопрос
-    if (isNextQuestionScheduled.current) {
-      console.log('handleAnswerClick: Next question already scheduled, skipping')
-      return
-    }
-    
-    isNextQuestionScheduled.current = true
-    console.log('handleAnswerClick: Scheduling next question in 2.5 seconds')
-    nextQuestionTimeoutRef.current = setTimeout(() => {
-      console.log('handleAnswerClick: Timeout fired, fetching next question')
-      // Проверяем еще раз перед загрузкой
-      if (showRoundSummary) {
-        console.log('handleAnswerClick: Skipping fetch (round summary is showing)')
-        isNextQuestionScheduled.current = false
-        return
-      }
-      // Сбрасываем флаг только перед вызовом fetchRandomQuestion
-      isNextQuestionScheduled.current = false
-      fetchRandomQuestion()
-    }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
+
+    // Не загружаем следующий вопрос сразу после ответа.
+    // В мультиплеере ждём всех игроков/ботов или окончания таймера.
   }
 
   const sendAnswer = async (questionId: number, answerId: number, isCorrect: boolean) => {

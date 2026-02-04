@@ -29,3 +29,7 @@ trivia-web/
 - **Cache**: Redis (используется из trivia-bot)
 - **Containerization**: Docker + Docker Compose
 - **Web Server**: Nginx
+
+## Последнее обновление
+
+- Исправлена логика обработки ответов: убран автоматический переход к следующему вопросу после ответа, используется polling механизм
