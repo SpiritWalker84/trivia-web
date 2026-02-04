@@ -196,7 +196,7 @@ const RoundSummary = ({ participants, roundNumber, totalRounds, onNextRound }: R
                     </div>
                   </div>
                   <div className="card-score eliminated-score">
-                    {participant.correct_answers}
+                    —
                   </div>
                 </motion.div>
               ))}

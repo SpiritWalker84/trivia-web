@@ -338,6 +338,8 @@ function App() {
         if (finishResponse.ok) {
           const finishData = await finishResponse.json()
           console.log(`✅ Round ${roundNumber} finished:`, finishData)
+          // Обновляем лидерборд сразу после завершения раунда, чтобы получить актуальные данные о выбывших
+          await fetchLeaderboard(true)
         } else {
           console.warn('Failed to finish current round, continuing anyway')
         }
@@ -448,8 +450,22 @@ function App() {
             gameId={gameId}
             userId={userId}
             onQuestionChange={handleQuestionChange}
-            onRoundComplete={() => {
+            onRoundComplete={async () => {
               console.log('📊 App: onRoundComplete called, round is completed')
+              // Сначала завершаем текущий раунд через API, чтобы обновить статус выбывших игроков
+              if (gameId && roundNumber > 0) {
+                try {
+                  const finishResponse = await fetch(`/api/round/finish-current?game_id=${gameId}`, {
+                    method: 'POST',
+                  })
+                  if (finishResponse.ok) {
+                    const finishData = await finishResponse.json()
+                    console.log(`✅ Round ${roundNumber} finished in onRoundComplete:`, finishData)
+                  }
+                } catch (error) {
+                  console.error('Error finishing current round in onRoundComplete:', error)
+                }
+              }
               // Устанавливаем флаг завершения раунда ПЕРЕД обновлением лидерборда
               setRoundCompleted(true)
               // Явно показываем summary
@@ -457,8 +473,8 @@ function App() {
               // Сбрасываем questionId и вопрос, чтобы QuestionViewer не пытался загрузить вопрос
               setQuestionId(null)
               setCurrentQuestion(null)
-              // Обновляем лидерборд для получения актуальных данных
-              fetchLeaderboard(true)
+              // Обновляем лидерборд для получения актуальных данных о выбывших игроках
+              await fetchLeaderboard(true)
             }}
             onQuestionLoaded={(question) => {
               console.log('📊 App: onQuestionLoaded called, fetching leaderboard with counter update')
