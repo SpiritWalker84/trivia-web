@@ -294,6 +294,13 @@ const QuestionViewer = ({ questionId, gameId, userId, onQuestionChange, onRoundC
     }, 2500) // 2.5 секунды задержки, чтобы пользователь успел увидеть правильный ответ
   }
 
+  // Передаем handleTimeUp в родительский компонент через callback
+  useEffect(() => {
+    if (onTimerTimeUp) {
+      onTimerTimeUp(handleTimeUp)
+    }
+  }, [onTimerTimeUp, handleTimeUp])
+
   const handleAnswerClick = (answerId: number) => {
     if (showResult) return
 
