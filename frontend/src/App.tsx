@@ -232,6 +232,28 @@ function App() {
     setInviteLink('')
     setRoomPlayers([])
   }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+        return
+      }
+    } catch (error) {
+      console.warn('Clipboard API failed, falling back:', error)
+    }
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.top = '0'
+    textarea.style.left = '0'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
   
   // Создать и запустить раунд
   const createAndStartRound = async (gameId: number, roundNumber: number) => {
@@ -516,6 +538,9 @@ function App() {
   }
 
   if (isWaitingRoom) {
+    const shareLink = inviteLink && inviteLink.startsWith('http')
+      ? inviteLink
+      : (inviteCode ? `${window.location.origin}/?room=${inviteCode}` : '')
     return (
       <div className="app">
         <div className="waiting-room">
@@ -526,16 +551,28 @@ function App() {
           <div className="waiting-invite">
             <div className="invite-item">
               <span className="invite-label">Код комнаты</span>
-              <div className="invite-value">{inviteCode || '—'}</div>
+              <div className="invite-value">
+                {inviteCode || '—'}
+                {inviteCode && (
+                  <button
+                    className="btn-copy-link"
+                    type="button"
+                    onClick={() => copyToClipboard(inviteCode)}
+                  >
+                    Скопировать
+                  </button>
+                )}
+              </div>
             </div>
-            {inviteLink && (
+            {shareLink && (
               <div className="invite-item">
                 <span className="invite-label">Ссылка</span>
                 <div className="invite-link">
-                  <input value={inviteLink} readOnly />
+                  <input value={shareLink} readOnly />
                   <button
                     className="btn-copy-link"
-                    onClick={() => navigator.clipboard.writeText(inviteLink)}
+                    type="button"
+                    onClick={() => copyToClipboard(shareLink)}
                   >
                     Скопировать
                   </button>
