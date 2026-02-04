@@ -1341,6 +1341,41 @@ async def get_user_info(telegram_id: Optional[int] = Query(None, description="Te
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error getting user info: {str(e)}")
 
+@app.get("/api/game/status")
+async def get_game_status(
+    game_id: Optional[int] = Query(None, description="ID игры")
+):
+    """
+    Получить статус игры
+    """
+    if not DB_MODELS_AVAILABLE or not _db_session_factory:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    if not game_id:
+        raise HTTPException(status_code=400, detail="game_id is required")
+    
+    try:
+        with get_db_session() as session:
+            game = session.query(Game).filter(Game.id == game_id).first()
+            
+            if not game:
+                raise HTTPException(status_code=404, detail="Game not found")
+            
+            return {
+                "game_id": game.id,
+                "status": game.status,
+                "total_rounds": game.total_rounds,
+                "current_round": game.current_round
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting game status: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting game status: {str(e)}")
+
 @app.post("/api/game/leave")
 async def leave_game(request: LeaveGameRequest):
     """
